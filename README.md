@@ -1,5 +1,7 @@
 # minurl [![NPM Version][npm-image]][npm-url] ![File Size][filesize-image] [![Build Status][travis-image]][travis-url] [![Coverage Status][coveralls-image]][coveralls-url] [![Dependency Status][david-image]][david-url]
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/stevenvachon/minurl.svg)](https://greenkeeper.io/)
+
 > Reduce and normalize the components of a [WHATWG URL](https://url.spec.whatwg.org).
 
 
