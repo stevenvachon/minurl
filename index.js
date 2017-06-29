@@ -8,31 +8,61 @@ const isURL = require("isurl");
 const stripWWW = require("strip-www");
 
 const defaultPorts = { "ftps:":990, "git:":9418, "scp:":22, "sftp:":22, "ssh:":22 };
-const directoryIndexes = ["index.html"];
 const emptyQueryValue = /([^&\?])=&/g;
 const encodedSpace = /%20/g;
-const multipleAmpersand = /&+/g;
+const indexFilenames = ["index.html"];
 const multipleSlashes = /\/{2,}/g;
 const queryNames = [];
-const trailingAmpersand = /&$/;
 const trailingEquals = /([^&\?])=$/;
 const trailingQuestion = /\?#?(?:.+)?$/;
 
-const carefulProfile = 
+
+
+const defaultValue = (customOptions, optionName, ...args) =>
+{
+	const defaultOption = evaluateValue(COMMON_PROFILE[optionName], ...args);
+
+	if (customOptions != null)
+	{
+		return defined( evaluateValue(customOptions[optionName], ...args), defaultOption );
+	}
+	else
+	{
+		return defaultOption;
+	}
+};
+
+
+
+const filterCommon = url => url.protocol==="http:" || url.protocol==="https:";
+
+const filterSafe = url => url.protocol === "mailto:";
+
+
+
+const filterSpecCompliant = url =>
+{
+	return filterSafe(url) || url.protocol==="http:" || url.protocol==="https:" || url.protocol==="ws:" || url.protocol==="wss:";
+};
+
+
+
+const CAREFUL_PROFILE =
 {
 	clone: true,
 	defaultPorts,
-	directoryIndexes,
+	indexFilenames,
 	plusQueries: true,
 	queryNames,
+	removeAuth: false,
 	removeDefaultPort: true,
-	removeDirectoryIndex: false,
-	removeEmptyDirectoryNames: false,
 	removeEmptyHash: true,
 	removeEmptyQueries:     filterSafe,
 	removeEmptyQueryNames:  filterSafe,
 	removeEmptyQueryValues: filterSafe,
+	removeEmptySegmentNames: false,
 	removeHash: false,
+	removeIndexFilename: false,
 	removeQueryNames: false,
 	removeQueryOddities: true,
 	removeRootTrailingSlash: true,
@@ -42,21 +72,22 @@ const carefulProfile =
 	stringify: true
 };
 
-const commonProfile = 
+const COMMON_PROFILE =
 {
 	clone: true,
 	defaultPorts,
-	directoryIndexes,
+	indexFilenames,
 	plusQueries: true,
 	queryNames,
+	removeAuth: false,
 	removeDefaultPort: true,
-	removeDirectoryIndex: filterCommon,
-	removeEmptyDirectoryNames: false,
 	removeEmptyHash: true,
 	removeEmptyQueries: filterSpecCompliant,
 	removeEmptyQueryNames:  filterSafe,
 	removeEmptyQueryValues: filterSafe,
+	removeEmptySegmentNames: false,
 	removeHash: false,
+	removeIndexFilename: filterCommon,
 	removeQueryNames: false,
 	removeQueryOddities: true,
 	removeRootTrailingSlash: true,
@@ -68,44 +99,7 @@ const commonProfile =
 
 
 
-function defaultValue(customOptions, optionName, ...args)
-{
-	const defaultOption = evaluateValue(commonProfile[optionName], ...args);
-
-	if (customOptions != null)
-	{
-		return defined( evaluateValue(customOptions[optionName], ...args), defaultOption );
-	}
-	else
-	{
-		return defaultOption;
-	}
-}
-
-
-
-function filterCommon(url)
-{
-	return url.protocol==="http:" || url.protocol==="https:";
-}
-
-
-
-function filterSafe(url)
-{
-	return url.protocol === "mailto:";
-}
-
-
-
-function filterSpecCompliant(url)
-{
-	return filterSafe(url) || url.protocol==="http:" || url.protocol==="https:" || url.protocol==="ws:" || url.protocol==="wss:";
-}
-
-
-
-function minURL(url, options)
+const minURL = (url, options) =>
 {
 	if (!isURL.lenient(url))
 	{
@@ -115,6 +109,12 @@ function minURL(url, options)
 	if (defaultValue(options, "clone", url))
 	{
 		url = cloneURL(url);
+	}
+
+	if (defaultValue(options, "removeAuth", url))
+	{
+		url.password = "";
+		url.username = "";
 	}
 
 	if (defaultValue(options, "removeDefaultPort", url))
@@ -127,19 +127,19 @@ function minURL(url, options)
 		}
 	}
 
-	if (defaultValue(options, "removeDirectoryIndex", url))
+	if (defaultValue(options, "removeIndexFilename", url))
 	{
-		const directoryIndexes = defaultValue(options, "directoryIndexes");
+		const indexFilenames = defaultValue(options, "indexFilenames");
 		const pathnameSegments = url.pathname.split("/");
 		const lastPathnameSegment = pathnameSegments[pathnameSegments.length - 1];
 
-		if (anyMatch(lastPathnameSegment, directoryIndexes))
+		if (anyMatch(lastPathnameSegment, indexFilenames))
 		{
 			url.pathname = url.pathname.slice(0, -lastPathnameSegment.length);
 		}
 	}
 
-	if (defaultValue(options, "removeEmptyDirectoryNames", url))
+	if (defaultValue(options, "removeEmptySegmentNames", url))
 	{
 		url.pathname = url.pathname.replace(multipleSlashes, "/");
 	}
@@ -156,7 +156,7 @@ function minURL(url, options)
 			url.hash = "";
 		}
 	}
-	
+
 	if (url.search !== "")
 	{
 		// If not a partial implementation
@@ -187,7 +187,7 @@ function minURL(url, options)
 
 				// Rebuild params
 				// NOTE :: `searchParams.delete()` will not remove individual values
-				params.filter( function([name, value])
+				params.filter(([name, value]) =>
 				{
 					const isRemovableQuery      = removeEmptyQueries     && name==="" && value==="";
 					const isRemovableQueryName  = removeEmptyQueryNames  && name==="" && value!=="";
@@ -202,7 +202,7 @@ function minURL(url, options)
 			{
 				const queryNames = defaultValue(options, "queryNames");
 
-				Array.from(url.searchParams.keys()).forEach( function(param)
+				Array.from(url.searchParams.keys()).forEach(param =>
 				{
 					if (anyMatch(param, queryNames))
 					{
@@ -215,30 +215,23 @@ function minURL(url, options)
 
 	if (defaultValue(options, "removeQueryOddities", url))
 	{
-		if (url.search === "")
-		{
-			if (trailingQuestion.test(url.href))
-			{
-				// Force `href` to update
-				url.search = "";
-			}
-		}
-		else
+		if (url.search !== "")
 		{
 			url.search = url.search
 			.replace(emptyQueryValue, "$1&")
-			.replace(multipleAmpersand, "&")  // TODO :: remove when "whatwg-url" has `URLSearchParams`
-			.replace(trailingAmpersand, "")
 			.replace(trailingEquals, "$1");
+		}
+		else if (trailingQuestion.test(url.href))
+		{
+			// Force `href` to update
+			url.search = "";
 		}
 	}
 
-	if (url.search !== "")
+	if (url.search!=="" && defaultValue(options, "plusQueries", url))
 	{
-		if (defaultValue(options, "plusQueries", url))
-		{
-			url.search = url.search.replace(encodedSpace, "+");
-		}
+		// TODO :: https://github.com/whatwg/url/issues/18
+		url.search = url.search.replace(encodedSpace, "+");
 	}
 
 	if (defaultValue(options, "removeWWW", url))
@@ -266,14 +259,14 @@ function minURL(url, options)
 			return url.href.replace(url.host + url.pathname, url.host);
 		}
 	}
-	
+
 	return url.href;
-}
+};
 
 
 
-minURL.CAREFUL_PROFILE = carefulProfile;
-minURL.COMMON_PROFILE = commonProfile;
+minURL.CAREFUL_PROFILE = CAREFUL_PROFILE;
+minURL.COMMON_PROFILE = COMMON_PROFILE;
 
 
 
