@@ -1,20 +1,17 @@
-# minurl [![NPM Version][npm-image]][npm-url] ![File Size][filesize-image] [![Build Status][travis-image]][travis-url] [![Coverage Status][coveralls-image]][coveralls-url] [![Dependency Status][david-image]][david-url]
+# minurl [![NPM Version][npm-image]][npm-url] ![File Size][filesize-image] [![Build Status][travis-image]][travis-url] [![Coverage Status][coveralls-image]][coveralls-url] [![Dependency Monitor][greenkeeper-image]][greenkeeper-url]
 
-> Reduce and normalize the components of a [WHATWG URL](https://url.spec.whatwg.org).
+> Reduce and normalize the components of a [`URL`](https://developer.mozilla.org/en/docs/Web/API/URL).
 
 
 ## Installation
 
-[Node.js](http://nodejs.org/) `>= 4` is required. To install, type this at the command line:
+[Node.js](http://nodejs.org/) `>= 8` is required. To install, type this at the command line:
 ```shell
 npm install minurl
 ```
 
 
 ## Usage
-
-Input *must* be a [`URL`](https://developer.mozilla.org/en/docs/Web/API/URL) instance.
-
 ```js
 const minURL = require('minurl');
 
@@ -24,7 +21,7 @@ minURL(url, options);
 //-> http://domain.com?param1=va+lue&param2
 ```
 
-**Note:** "www" subdomains and "index.html" document indexes are *not* part of *any* specification. They are merely a common configuration on many HTTP servers. Consider this when deciding on which options to use.
+**Note:** "www" subdomains and "index.html" indexes are *not* part of *any* specification. They are merely a common configuration on many HTTP servers. Consider this when deciding on which options to use.
 
 
 ## Options
@@ -41,10 +38,10 @@ Type: `Object`
 Default value: `{'ftps:':990, 'git:':9418, 'scp:':22, 'sftp:':22, 'ssh:':22}`  
 A map of protocol default ports for [`removeDefaultPort`](#removedefaultport). Be sure to include the suffixed ":" in the key. [Common protocols](https://url.spec.whatwg.org/#special-scheme) already have their ports removed.
 
-### `directoryIndexes`
+### `indexFilenames`
 Type: `Array<RegExp|string>`  
 Default value: `['index.html']`  
-A list of file names for [`removeDirectoryIndex`](#removedirectoryindex).
+A list of file names for [`removeIndexFilename`](#removeindexfilename).
 
 ### `plusQueries`
 Type: `Boolean` or `Function`  
@@ -56,20 +53,15 @@ Type: `Array<RegExp|string>`
 Default value: `[]`  
 A list of query parameters for [`removeQueryNames`](#removequerynames).
 
+### `removeAuth`
+Type: `Boolean` or `Function`  
+Default value: `false`  
+When set to `true` or a function that returns `true`, a URL's username and password will be removed.
+
 ### `removeDefaultPort`
 Type: `Boolean` or `Function`  
 Default value: `true`  
 When set to `true` or a function that returns `true`, a URL's port that matches any found in [`defaultPorts`](#defaultports) will be removed.
-
-### `removeDirectoryIndex`
-Type: `Boolean` or `Function`  
-Default value: [`Function`](https://github.com/stevenvachon/minurl/blob/master/src/minurl.js#L87-L90)  
-When set to `true` or a function that returns `true`, a URL's file name that matches any found in [`directoryIndexes`](#directoryindexes) will be removed.
-
-### `removeEmptyDirectoryNames`
-Type: `Boolean` or `Function`  
-Default value: `false`  
-When set to `true` or a function that returns `true`, empty directory names within a URL's path will be removed. For example, the "//" in "/path//to/" will become "/path/to/". Protocol-relative URLs will not be affected.
 
 ### `removeEmptyHash`
 Type: `Boolean` or `Function`  
@@ -91,10 +83,20 @@ Type: `Boolean` or `Function`
 Default value: [`Function`](https://github.com/stevenvachon/minurl/blob/master/src/minurl.js#L94-L97)  
 When set to `true` or a function that returns `true`, a URL's query parameters that contain no value (such as "?var=" and "?var") will be removed.
 
+### `removeEmptySegmentNames`
+Type: `Boolean` or `Function`  
+Default value: `false`  
+When set to `true` or a function that returns `true`, empty segment names within a URL's path will be removed. For example, the "//" in "/path//to/" will become "/path/to/". Protocol-relative URLs will not be affected.
+
 ### `removeHash`
 Type: `Boolean` or `Function`  
 Default value: `false`  
 When set to `true` or a function that returns `true`, a URL's hash will be removed.
+
+### `removeIndexFilename`
+Type: `Boolean` or `Function`  
+Default value: [`Function`](https://github.com/stevenvachon/minurl/blob/master/src/minurl.js#L87-L90)  
+When set to `true` or a function that returns `true`, a URL's file name that matches any found in [`indexFilenames`](#indexfilenames) will be removed.
 
 ### `removeQueryNames`
 Type: `Boolean` or `Function`  
@@ -137,8 +139,8 @@ When set to `true`, a string will be returned. When set to `false`, a `URL` will
 When an option is defined as a `Function`, it must return `true` to be included in the custom filter:
 ```js
 const options = {
-  removeDirectoryIndex: function(url) {
-    // Only URLs with these protocols will have their directory indexes removed
+  removeIndexFilename: url => {
+    // Only URLs with these protocols will have their index filename removed
     return url.protocol === 'http:' && url.protocol === 'https:';
   }
 };
@@ -153,39 +155,46 @@ const options = {
 
 An example of checking for a trusted hostname:
 ```js
-const url = new URL('http://www.domain.com/index.html?param1=va%20lue&param2=');
+const profile = url => {
+  const trustedHosts = ['domain.com'];
 
-const trustedHosts = ['domain.com'];
+  const isTrusted = trustedHosts.some(trustedHost => {
+    return url.hostname === trustedHost || url.hostname.endsWith(`.${trustedHost}`);
+  });
 
-const isTrusted = trustedHosts.reduce(function(result, trustedHost) {
-  return result || url.hostname.endsWith(trustedHost);
-}, false);
+  return minURL[`${isTrusted ? 'COMMON' : 'CAREFUL'}_PROFILE`];
+};
 
-const options = minURL[`${isTrusted ? 'COMMON' : 'CAREFUL'}_PROFILE`];
+const url1 = new URL('http://www.domain.com/index.html?param1=va%20lue&param2=');
+const url2 = new URL('http://www.fake-domain.com/index.html?param1=va%20lue&param2=');
 
-minURL(url, options);
+minURL(url1, profile(url1));  // will use "common" profile
+minURL(url2, profile(url2));  // will use "careful" profile
 ```
 
 
 #### Customizing Profiles
 
 ```js
-const custom = Object.assign({}, minURL.CAREFUL_PROFILE, { removeTrailingSlash:true });
+const custom = {
+  ...minURL.COMMON_PROFILE,
+  indexFilenames: ['index.html', 'index.php']
+};
 ```
 Or:
 ```js
 const extend = require('extend');
 
-const custom = extend(true, {}, minURL.COMMON_PROFILE, { directoryIndexes:['index.php'] });
+const custom = extend(true, {}, minURL.COMMON_PROFILE, { indexFilenames:['index.php'] });
 ```
 
 
 [npm-image]: https://img.shields.io/npm/v/minurl.svg
-[npm-url]: https://npmjs.org/package/minurl
-[filesize-image]: https://img.shields.io/badge/size-2.4kB%20gzipped-blue.svg
+[npm-url]: https://npmjs.com/package/minurl
+[filesize-image]: https://img.shields.io/badge/size-2.5kB%20gzipped-blue.svg
 [travis-image]: https://img.shields.io/travis/stevenvachon/minurl.svg
 [travis-url]: https://travis-ci.org/stevenvachon/minurl
 [coveralls-image]: https://img.shields.io/coveralls/stevenvachon/minurl.svg
 [coveralls-url]: https://coveralls.io/github/stevenvachon/minurl
-[david-image]: https://img.shields.io/david/stevenvachon/minurl.svg
-[david-url]: https://david-dm.org/stevenvachon/minurl
+[greenkeeper-image]: https://badges.greenkeeper.io/stevenvachon/minurl.svg
+[greenkeeper-url]: https://greenkeeper.io/
