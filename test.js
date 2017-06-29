@@ -1,104 +1,45 @@
 "use strict";
-const decache = require("decache");
-const expect = require("chai").expect;
-const minURL = require("./lib/minurl");
-const universalURL = require("universal-url");
-
-const describe_searchParamsOnly = universalURL.supportsSearchParams ? describe : describe.skip;
-const it_searchParamsOnly       = universalURL.supportsSearchParams ? it : it.skip;
-
-const URL = universalURL.URL;
+const {before, describe, it} = require("mocha");
+const customizeURL = require("incomplete-url");
+const {expect} = require("chai");
+const minURL = require("./");
+const {URL, URLSearchParams} = require("universal-url");
 
 
 
-function httpOnly(url)
-{
-	return url.protocol==="http:" || url.protocol==="https:";
-}
+const httpOnly = url => url.protocol==="http:" || url.protocol==="https:";
 
 
 
-function options(overrides)
-{
-	const resetOptions =
-	{
-		clone: false,
-		defaultPorts: {},
-		directoryIndexes: [],
-		plusQueries: false,
-		queryNames: [],
-		removeDefaultPort: false,
-		removeEmptyDirectoryNames: false,
-		removeDirectoryIndex: false,
-		removeEmptyHash: false,
-		removeEmptyQueries: false,
-		removeEmptyQueryNames: false,
-		removeEmptyQueryValues: false,
-		removeHash: false,
-		removeQueryNames: false,
-		removeQueryOddities: false,
-		removeRootTrailingSlash: false,
-		removeTrailingSlash: false,
-		removeWWW: false,
-		sortQueries: false,
-		stringify: true  // special
-	};
-
-	return Object.assign(resetOptions, overrides);
-}
+const options = overrides =>
+({
+	clone: false,
+	defaultPorts: {},
+	indexFilenames: [],
+	plusQueries: false,
+	queryNames: [],
+	removeAuth: false,
+	removeDefaultPort: false,
+	removeEmptyHash: false,
+	removeEmptyQueries: false,
+	removeEmptyQueryNames: false,
+	removeEmptyQueryValues: false,
+	removeEmptySegmentNames: false,
+	removeHash: false,
+	removeIndexFilename: false,
+	removeQueryNames: false,
+	removeQueryOddities: false,
+	removeRootTrailingSlash: false,
+	removeTrailingSlash: false,
+	removeWWW: false,
+	sortQueries: false,
+	stringify: true,  // special
+	...overrides
+});
 
 
 
-function requireIncompleteURL(searchParams)
-{
-	decache("whatwg-url");  // avoid mutating other instances
-	const IncompleteURL = require("whatwg-url").URL;
-
-	if (searchParams)
-	{
-		const IncompleteURLSearchParams = require("url-search-params");
-
-		const paramsProto = IncompleteURLSearchParams.prototype;
-
-		paramsProto.__org_append = paramsProto.append;
-		paramsProto.append = function()
-		{
-			paramsProto.__org_append.apply(this, arguments);
-			this.__URL.search = this.toString();
-		};
-
-		const urlProto = IncompleteURL.prototype;
-		const searchSetSuper = Object.getOwnPropertyDescriptor(urlProto, "search").set;
-
-		Object.defineProperty(urlProto, "search", 
-		{
-			set: function(newValue)
-			{
-				this.__searchParams = new IncompleteURLSearchParams(newValue);
-				this.__searchParams.__URL = this;
-				searchSetSuper.apply(this, [newValue]);
-			}
-		});
-
-		Object.defineProperty(urlProto, "searchParams", 
-		{
-			get: function()
-			{
-				return this.__searchParams;
-			},
-			set: function(newValue)
-			{
-				this.__searchParams = newValue;
-			}
-		});
-	}
-
-	return IncompleteURL;
-}
-
-
-
-it(`has "careful" options profile publicly available`, function()
+it(`has "careful" options profile publicly available`, () =>
 {
 	expect( minURL.CAREFUL_PROFILE ).to.be.an("object");
 
@@ -111,7 +52,7 @@ it(`has "careful" options profile publicly available`, function()
 
 
 
-it(`has "common" options profile publicly available`, function()
+it(`has "common" options profile publicly available`, () =>
 {
 	expect( minURL.COMMON_PROFILE ).to.be.an("object");
 
@@ -124,730 +65,772 @@ it(`has "common" options profile publicly available`, function()
 
 
 
-it("accepts URL input", function()
+it("accepts URL input", () =>
 {
 	const opts = options();
-	const url1 = new URL("http://www.domain.com:123/dir/file.html?qu ery#hash");
-	const url2 =         "http://www.domain.com:123/dir/file.html?qu%20ery#hash";
+	const url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?qu ery#hash");
+	const url2 =         "http://user:pass@www.domain.com:123/dir/file.html?qu%20ery#hash";
 	expect( minURL(url1,opts) ).to.equal(url2);
 });
 
 
 
-it("rejects non-URL input", function()
+it("rejects non-URL input", () =>
 {
 	const opts = options();
-	const url = "http://www.domain.com:123/dir/file.html?query#hash";
+	const url = "http://user:pass@www.domain.com:123/dir/file.html?query#hash";
 	expect(() => minURL(url, opts)).to.throw(TypeError);
 });
 
 
 
-describe("options", function()
+describe("options", () =>
 {
 	// NOTE :: `options.clone` is tested further down
 
 
 
-	it("plusQueries = false", function()
+	it("plusQueries = false", () =>
 	{
 		const opts = options();
-		const url1 = "http://www.domain.com:123/?va%20+r1=%20+dir&var2=text#hash";
+		const url1 = "http://user:pass@www.domain.com:123/?va%20+r1=%20+dir&var2=text#hash";
 		const url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("plusQueries = true", function()
+	it("plusQueries = true", () =>
 	{
 		const opts = options({ plusQueries:true });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir%20name/file.html?va%20r1=%20+dir&var2=text#hash");
-		url2 =         "http://www.domain.com:123/dir%20name/file.html?va+r1=++dir&var2=text#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir%20name/file.html?va%20r1=%20+dir&var2=text#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir%20name/file.html?va+r1=++dir&var2=text#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.domain.com:123/dir%20name/file.html#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir%20name/file.html#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("other://www.domain.com:123/dir%20name/file.html?va%20r1=%20+dir&var2=text#hash");
-		url2 =         "other://www.domain.com:123/dir%20name/file.html?va+r1=++dir&var2=text#hash";
+		url1 = new URL("other://user:pass@www.domain.com:123/dir%20name/file.html?va%20r1=%20+dir&var2=text#hash");
+		url2 =         "other://user:pass@www.domain.com:123/dir%20name/file.html?va+r1=++dir&var2=text#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 	});
 
 
 
-	it("plusQueries = function", function()
+	it("plusQueries = function", () =>
 	{
 		const opts = options({ plusQueries:httpOnly });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir%20name/file.html?va%20r1=%20+dir&var2=text#hash");
-		url2 =         "http://www.domain.com:123/dir%20name/file.html?va+r1=++dir&var2=text#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir%20name/file.html?va%20r1=%20+dir&var2=text#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir%20name/file.html?va+r1=++dir&var2=text#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.domain.com:123/dir%20name/file.html#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir%20name/file.html#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "other://www.domain.com:123/dir%20name/file.html?va%20r1=%20+dir&var2=text#hash";
+		url1 = "other://user:pass@www.domain.com:123/dir%20name/file.html?va%20r1=%20+dir&var2=text#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeDefaultPort = false", function()
-	{
-		const opts = options({ defaultPorts:{ "http:":1234 } });
-		const url1 = "http://www.domain.com:1234/dir/file.html?query#hash";
-		const url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal(url1);
-	});
-
-
-
-	it("removeDefaultPort = true", function()
-	{
-		const opts = options({ removeDefaultPort:true, defaultPorts:{ "http:":1234 } });
-		let url1,url2;
-
-		url1 = new URL("http://www.domain.com:1234/dir/file.html?query#hash");
-		url2 =         "http://www.domain.com/dir/file.html?query#hash";
-		expect( minURL(url1,opts) ).to.equal(url2);
-
-		url1 = "http://www.domain.com:123/dir/file.html?query#hash";
-		url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal(url1);
-
-		url1 = "other://www.domain.com:1234/dir/file.html?query#hash";
-		url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal(url1);
-	});
-
-
-
-	it("removeDefaultPort = function", function()
-	{
-		const opts = options({ removeDefaultPort:httpOnly, defaultPorts:{ "http:":1234, "other:":1234 } });
-		let url1,url2;
-
-		url1 = new URL("http://www.domain.com:1234/dir/file.html?query#hash");
-		url2 =         "http://www.domain.com/dir/file.html?query#hash";
-		expect( minURL(url1,opts) ).to.equal(url2);
-
-		url1 = "http://www.domain.com:123/dir/file.html?query#hash";
-		url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal(url1);
-
-		url1 = "other://www.domain.com:1234/dir/file.html?query#hash";
-		url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal(url1);
-	});
-
-
-
-	it("removeDirectoryIndex = false", function()
-	{
-		const opts = options({ directoryIndexes:["other.html"] });
-		const url1 = "http://www.domain.com:123/dir/other.html?query#hash";
-		const url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal(url1);
-	});
-
-
-
-	it("removeDirectoryIndex = true", function()
-	{
-		let opts = options({ removeDirectoryIndex:true, directoryIndexes:["other.html"] });
-		let url1,url2;
-
-		url1 = new URL("http://www.domain.com:123/other.html");
-		url2 =         "http://www.domain.com:123/";
-		expect( minURL(url1,opts) ).to.equal(url2);
-
-		url1 = new URL("http://www.domain.com:123/dir/other.html?query#hash");
-		url2 =         "http://www.domain.com:123/dir/?query#hash";
-		expect( minURL(url1,opts) ).to.equal(url2);
-
-		url1 = "http://www.domain.com:123/another.html";
-		url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal(url1);
-
-		url1 = "http://www.domain.com:123/dir/another.html?query#hash";
-		url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal(url1);
-
-		url1 = new URL("other://www.domain.com:123/other.html?query#hash");
-		url2 =         "other://www.domain.com:123/?query#hash";
-		expect( minURL(url1,opts) ).to.equal(url2);
-
-		opts = options({ removeDirectoryIndex:true, directoryIndexes:[/^another\.[a-z]+$/] });
-		url1 = new URL("http://www.domain.com:123/another.html");
-		url2 =         "http://www.domain.com:123/";
-		expect( minURL(url1,opts) ).to.equal(url2);
-	});
-
-
-
-	it("removeDirectoryIndex = function", function()
-	{
-		const opts = options({ removeDirectoryIndex:httpOnly, directoryIndexes:["other.html"] });
-		let url1,url2;
-
-		url1 = new URL("http://www.domain.com:123/other.html?query#hash");
-		url2 =         "http://www.domain.com:123/?query#hash";
-		expect( minURL(url1,opts) ).to.equal(url2);
-
-		url1 = "other://www.domain.com:123/other.html?query#hash";
-		url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal(url1);
-	});
-
-
-
-	it("removeEmptyDirectoryNames = false", function()
+	it("removeAuth = false", () =>
 	{
 		const opts = options();
-		const url1 = "http://www.domain.com:123/dir//file.html?query#hash";
+		const url1 = "http://user:pass@www.domain.com:123/dir/file.html?query#hash";
 		const url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
-	
 
 
-	it("removeEmptyDirectoryNames = true", function()
+
+	it("removeAuth = true", () =>
 	{
-		const opts = options({ removeEmptyDirectoryNames:true });
+		const opts = options({ removeAuth:true });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir//file.html?query#hash");
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?query#hash");
 		url2 =         "http://www.domain.com:123/dir/file.html?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = new URL("http://www.domain.com:123/dir///file.html?query#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html?query#hash";
-		expect( minURL(url1,opts) ).to.equal(url2);
-
-		url1 = new URL("other://www.domain.com:123/dir//file.html?query#hash");
+		url1 = new URL("other://user:pass@www.domain.com:123/dir/file.html?query#hash");
 		url2 =         "other://www.domain.com:123/dir/file.html?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 	});
 
 
 
-	it("removeEmptyDirectoryNames = function", function()
+	it("removeAuth = function", () =>
 	{
-		const opts = options({ removeEmptyDirectoryNames:httpOnly });
+		const opts = options({ removeAuth:httpOnly });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir//file.html?query#hash");
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?query#hash");
 		url2 =         "http://www.domain.com:123/dir/file.html?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = new URL("http://www.domain.com:123/dir///file.html?query#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html?query#hash";
-		expect( minURL(url1,opts) ).to.equal(url2);
-
-		url1 = "other://www.domain.com:123/dir//file.html?query#hash";
+		url1 = "other://user:pass@www.domain.com:123/dir/file.html?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeEmptyHash = false", function()
+	it("removeDefaultPort = false", () =>
 	{
-		const opts = options();
-		const url1 = "http://www.domain.com:123/dir/file.html?query#";
+		const opts = options({ defaultPorts:{ "http:":1234 } });
+		const url1 = "http://user:pass@www.domain.com:1234/dir/file.html?query#hash";
 		const url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeEmptyHash = true", function()
+	it("removeDefaultPort = true", () =>
+	{
+		const opts = options({ removeDefaultPort:true, defaultPorts:{ "http:":1234 } });
+		let url1,url2;
+
+		url1 = new URL("http://user:pass@www.domain.com:1234/dir/file.html?query#hash");
+		url2 =         "http://user:pass@www.domain.com/dir/file.html?query#hash";
+		expect( minURL(url1,opts) ).to.equal(url2);
+
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?query#hash";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
+
+		url1 = "other://user:pass@www.domain.com:1234/dir/file.html?query#hash";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
+	});
+
+
+
+	it("removeDefaultPort = function", () =>
+	{
+		const opts = options({ removeDefaultPort:httpOnly, defaultPorts:{ "http:":1234, "other:":1234 } });
+		let url1,url2;
+
+		url1 = new URL("http://user:pass@www.domain.com:1234/dir/file.html?query#hash");
+		url2 =         "http://user:pass@www.domain.com/dir/file.html?query#hash";
+		expect( minURL(url1,opts) ).to.equal(url2);
+
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?query#hash";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
+
+		url1 = "other://user:pass@www.domain.com:1234/dir/file.html?query#hash";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
+	});
+
+
+
+	it("removeEmptyHash = false", () =>
+	{
+		const opts = options();
+		const url1 = "http://user:pass@www.domain.com:123/dir/file.html?query#";
+		const url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
+	});
+
+
+
+	it("removeEmptyHash = true", () =>
 	{
 		const opts = options({ removeEmptyHash:true });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?query#");
-		url2 =         "http://www.domain.com:123/dir/file.html?query";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?query#");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?query";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.domain.com:123/dir/file.html?query#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://www.domain.com:123/dir/file.html?query";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?query";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("other://www.domain.com:123/dir/file.html?query#");
-		url2 =         "other://www.domain.com:123/dir/file.html?query";
+		url1 = new URL("other://user:pass@www.domain.com:123/dir/file.html?query#");
+		url2 =         "other://user:pass@www.domain.com:123/dir/file.html?query";
 		expect( minURL(url1,opts) ).to.equal(url2);
 	});
 
 
 
-	it("removeEmptyHash = function", function()
+	it("removeEmptyHash = function", () =>
 	{
 		const opts = options({ removeEmptyHash:httpOnly });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?query#");
-		url2 =         "http://www.domain.com:123/dir/file.html?query";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?query#");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?query";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "other://www.domain.com:123/dir/file.html?query#";
+		url1 = "other://user:pass@www.domain.com:123/dir/file.html?query#";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeEmptyQueries = false", function()
+	it("removeEmptyQueries = false", () =>
 	{
 		const opts = options();
-		const url1 = "http://www.domain.com:123/dir/file.html?=#hash";
+		const url1 = "http://user:pass@www.domain.com:123/dir/file.html?=#hash";
 		const url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it_searchParamsOnly("removeEmptyQueries = true", function()
+	it("removeEmptyQueries = true", () =>
 	{
 		const opts = options({ removeEmptyQueries:true });
 		let url1,url2;
 
-		url1 = "http://www.domain.com:123/dir/file.html?var=#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?var=#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://www.domain.com:123/dir/file.html?=value#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?=value#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?=#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?=#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.domain.com:123/dir/file.html?var1=value&var2=#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?var1=value&var2=#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://www.domain.com:123/dir/file.html?var1=value&=value#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?var1=value&=value#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?var1=value&=#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html?var1=value#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?var1=value&=#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?var1=value#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.domain.com:123/dir/file.html?var=&var=value&var=#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?var=&var=value&var=#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?var=&=value&=#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html?var=&=value#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?var=&=value&=#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?var=&=value#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = new URL("other://www.domain.com:123/dir/file.html?var=&=value&=#hash");
-		url2 =         "other://www.domain.com:123/dir/file.html?var=&=value#hash";
+		url1 = new URL("other://user:pass@www.domain.com:123/dir/file.html?var=&=value&=#hash");
+		url2 =         "other://user:pass@www.domain.com:123/dir/file.html?var=&=value#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 	});
 
 
 
-	it_searchParamsOnly("removeEmptyQueries = function", function()
+	it("removeEmptyQueries = function", () =>
 	{
 		const opts = options({ removeEmptyQueries:httpOnly });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?=&=#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?=&=#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "other://www.domain.com:123/dir/file.html?=&=#hash";
+		url1 = "other://user:pass@www.domain.com:123/dir/file.html?=&=#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeEmptyQueryNames = false", function()
+	it("removeEmptyQueryNames = false", () =>
 	{
 		const opts = options();
-		const url1 = "http://www.domain.com:123/dir/file.html?=value#hash";
+		const url1 = "http://user:pass@www.domain.com:123/dir/file.html?=value#hash";
 		const url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it_searchParamsOnly("removeEmptyQueryNames = true", function()
+	it("removeEmptyQueryNames = true", () =>
 	{
 		const opts = options({ removeEmptyQueryNames:true });
 		let url1,url2;
 
-		url1 = "http://www.domain.com:123/dir/file.html?var=#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?var=#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?=value#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?=value#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.domain.com:123/dir/file.html?=#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?=#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://www.domain.com:123/dir/file.html?var1=value&var2=#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?var1=value&var2=#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?var1=value&=value#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html?var1=value#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?var1=value&=value#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?var1=value#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.domain.com:123/dir/file.html?var1=value&=#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?var1=value&=#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://www.domain.com:123/dir/file.html?var=&var=value&var=#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?var=&var=value&var=#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?var=&=value&=#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html?var=&=#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?var=&=value&=#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?var=&=#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = new URL("other://www.domain.com:123/dir/file.html?var=&=value&=#hash");
-		url2 =         "other://www.domain.com:123/dir/file.html?var=&=#hash";
+		url1 = new URL("other://user:pass@www.domain.com:123/dir/file.html?var=&=value&=#hash");
+		url2 =         "other://user:pass@www.domain.com:123/dir/file.html?var=&=#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 	});
 
 
 
-	it_searchParamsOnly("removeEmptyQueryNames = function", function()
+	it("removeEmptyQueryNames = function", () =>
 	{
 		const opts = options({ removeEmptyQueryNames:httpOnly });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?=value#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?=value#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "other://www.domain.com:123/dir/file.html?=value#hash";
+		url1 = "other://user:pass@www.domain.com:123/dir/file.html?=value#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeEmptyQueryValues = false", function()
+	it("removeEmptyQueryValues = false", () =>
 	{
 		const opts = options();
-		const url1 = "http://www.domain.com:123/dir/file.html?var=#hash";
+		const url1 = "http://user:pass@www.domain.com:123/dir/file.html?var=#hash";
 		const url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it_searchParamsOnly("removeEmptyQueryValues = true", function()
+	it("removeEmptyQueryValues = true", () =>
 	{
 		const opts = options({ removeEmptyQueryValues:true });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?var=#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?var=#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.domain.com:123/dir/file.html?=value#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?=value#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://www.domain.com:123/dir/file.html?=#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?=#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?var1=value&var2=#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html?var1=value#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?var1=value&var2=#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?var1=value#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.domain.com:123/dir/file.html?var1=value&=value#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?var1=value&=value#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://www.domain.com:123/dir/file.html?var1=value&=#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?var1=value&=#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?var=&var=value&var=#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html?var=value#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?var=&var=value&var=#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?var=value#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?var=&=value&=#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html?=value&=#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?var=&=value&=#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?=value&=#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = new URL("other://www.domain.com:123/dir/file.html?var=&=value&=#hash");
-		url2 =         "other://www.domain.com:123/dir/file.html?=value&=#hash";
+		url1 = new URL("other://user:pass@www.domain.com:123/dir/file.html?var=&=value&=#hash");
+		url2 =         "other://user:pass@www.domain.com:123/dir/file.html?=value&=#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 	});
 
 
 
-	it_searchParamsOnly("removeEmptyQueryValues = function", function()
+	it("removeEmptyQueryValues = function", () =>
 	{
 		const opts = options({ removeEmptyQueryValues:httpOnly });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?var=#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?var=#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "other://www.domain.com:123/dir/file.html?var=#hash";
+		url1 = "other://user:pass@www.domain.com:123/dir/file.html?var=#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeHash = false", function()
+	it("removeEmptySegmentNames = false", () =>
 	{
 		const opts = options();
-		const url1 = "http://www.domain.com:123/dir/file.html?query#hash";
+		const url1 = "http://user:pass@www.domain.com:123/dir//file.html?query#hash";
 		const url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeHash = true", function()
+	it("removeEmptySegmentNames = true", () =>
+	{
+		const opts = options({ removeEmptySegmentNames:true });
+		let url1,url2;
+
+		url1 = new URL("http://user:pass@www.domain.com:123/dir//file.html?query#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?query#hash";
+		expect( minURL(url1,opts) ).to.equal(url2);
+
+		url1 = new URL("http://user:pass@www.domain.com:123/dir///file.html?query#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?query#hash";
+		expect( minURL(url1,opts) ).to.equal(url2);
+
+		url1 = new URL("other://user:pass@www.domain.com:123/dir//file.html?query#hash");
+		url2 =         "other://user:pass@www.domain.com:123/dir/file.html?query#hash";
+		expect( minURL(url1,opts) ).to.equal(url2);
+	});
+
+
+
+	it("removeEmptySegmentNames = function", () =>
+	{
+		const opts = options({ removeEmptySegmentNames:httpOnly });
+		let url1,url2;
+
+		url1 = new URL("http://user:pass@www.domain.com:123/dir//file.html?query#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?query#hash";
+		expect( minURL(url1,opts) ).to.equal(url2);
+
+		url1 = new URL("http://user:pass@www.domain.com:123/dir///file.html?query#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?query#hash";
+		expect( minURL(url1,opts) ).to.equal(url2);
+
+		url1 = "other://user:pass@www.domain.com:123/dir//file.html?query#hash";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
+	});
+
+
+
+	it("removeHash = false", () =>
+	{
+		const opts = options();
+		const url1 = "http://user:pass@www.domain.com:123/dir/file.html?query#hash";
+		const url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
+	});
+
+
+
+	it("removeHash = true", () =>
 	{
 		const opts = options({ removeHash:true });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?query#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html?query";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?query#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?query";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?query#");
-		url2 =         "http://www.domain.com:123/dir/file.html?query";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?query#");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?query";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.domain.com:123/dir/file.html?query";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?query";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("other://www.domain.com:123/dir/file.html?query#hash");
-		url2 =         "other://www.domain.com:123/dir/file.html?query";
+		url1 = new URL("other://user:pass@www.domain.com:123/dir/file.html?query#hash");
+		url2 =         "other://user:pass@www.domain.com:123/dir/file.html?query";
 		expect( minURL(url1,opts) ).to.equal(url2);
 	});
 
 
 
-	it("removeHash = function", function()
+	it("removeHash = function", () =>
 	{
 		const opts = options({ removeHash:httpOnly });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?query#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html?query";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?query#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?query";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "other://www.domain.com:123/dir/file.html?query#hash";
+		url1 = "other://user:pass@www.domain.com:123/dir/file.html?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeQueryNames = false", function()
+	it("removeIndexFilename = false", () =>
 	{
-		const opts = options({ queryNames:["query"] });
-		const url1 = "http://www.domain.com:123/dir/file.html?query=value#hash";
+		const opts = options({ indexFilenames:["other.html"] });
+		const url1 = "http://user:pass@www.domain.com:123/dir/other.html?query#hash";
 		const url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it_searchParamsOnly("removeQueryNames = true", function()
+	it("removeIndexFilename = true", () =>
+	{
+		let opts = options({ removeIndexFilename:true, indexFilenames:["other.html"] });
+		let url1,url2;
+
+		url1 = new URL("http://user:pass@www.domain.com:123/other.html");
+		url2 =         "http://user:pass@www.domain.com:123/";
+		expect( minURL(url1,opts) ).to.equal(url2);
+
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/other.html?query#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/?query#hash";
+		expect( minURL(url1,opts) ).to.equal(url2);
+
+		url1 = "http://user:pass@www.domain.com:123/another.html";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
+
+		url1 = "http://user:pass@www.domain.com:123/dir/another.html?query#hash";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
+
+		url1 = new URL("other://user:pass@www.domain.com:123/other.html?query#hash");
+		url2 =         "other://user:pass@www.domain.com:123/?query#hash";
+		expect( minURL(url1,opts) ).to.equal(url2);
+
+		opts = options({ removeIndexFilename:true, indexFilenames:[/^another\.[a-z]+$/] });
+		url1 = new URL("http://user:pass@www.domain.com:123/another.html");
+		url2 =         "http://user:pass@www.domain.com:123/";
+		expect( minURL(url1,opts) ).to.equal(url2);
+	});
+
+
+
+	it("removeIndexFilename = function", () =>
+	{
+		const opts = options({ removeIndexFilename:httpOnly, indexFilenames:["other.html"] });
+		let url1,url2;
+
+		url1 = new URL("http://user:pass@www.domain.com:123/other.html?query#hash");
+		url2 =         "http://user:pass@www.domain.com:123/?query#hash";
+		expect( minURL(url1,opts) ).to.equal(url2);
+
+		url1 = "other://user:pass@www.domain.com:123/other.html?query#hash";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
+	});
+
+
+
+	it("removeQueryNames = false", () =>
+	{
+		const opts = options({ queryNames:["query"] });
+		const url1 = "http://user:pass@www.domain.com:123/dir/file.html?query=value#hash";
+		const url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
+	});
+
+
+
+	it("removeQueryNames = true", () =>
 	{
 		let opts,url1,url2;
 
 		opts = options({ queryNames:["var1"], removeQueryNames:true });
-		url1 = new URL("http://www.domain.com:123/dir/file.html?var1=value1&var1=value2&var2=value#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html?var2=value#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?var1=value1&var1=value2&var2=value#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?var2=value#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
 		opts = options({ queryNames:[/^var\d+$/], removeQueryNames:true });
-		url1 = new URL("http://www.domain.com:123/dir/file.html?var1=value1&var1=value2&var2=value#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?var1=value1&var1=value2&var2=value&var=value#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?var=value#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 	});
 
 
 
-	it_searchParamsOnly("removeQueryNames = function", function()
+	it("removeQueryNames = function", () =>
 	{
-		const opts = options({ queryNames:["query"], removeQueryNames:httpOnly });
+		const opts = options({ queryNames:["var1"], removeQueryNames:httpOnly });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?query#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?var1=value&var2=value#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?var2=value#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "other://www.domain.com:123/dir/file.html?query#hash";
+		url1 = "other://user:pass@www.domain.com:123/dir/file.html?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeQueryOddities = false", function()
+	it("removeQueryOddities = false", () =>
 	{
 		const opts = options();
-		const url1 = "http://domain.com/?";
+		const url1 = "http://user:pass@domain.com/?";
 		const url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeQueryOddities = true", function()
+	it("removeQueryOddities = true", () =>
 	{
 		const opts = options({ removeQueryOddities:true });
 		let url1,url2;
 
-		url1 = new URL("http://domain.com/?");
-		url2 =         "http://domain.com/";
+		url1 = new URL("http://user:pass@domain.com/?");
+		url2 =         "http://user:pass@domain.com/";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = new URL("http://domain.com/?#hash");
-		url2 =         "http://domain.com/#hash";
+		url1 = new URL("http://user:pass@domain.com/?#hash");
+		url2 =         "http://user:pass@domain.com/#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = new URL("http://domain.com/?#");
-		url2 =         "http://domain.com/#";
+		url1 = new URL("http://user:pass@domain.com/?#");
+		url2 =         "http://user:pass@domain.com/#";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = new URL("http://domain.com/?var=");
-		url2 =         "http://domain.com/?var";
+		url1 = new URL("http://user:pass@domain.com/?var=");
+		url2 =         "http://user:pass@domain.com/?var";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = new URL("http://domain.com/?var1=&var2=");
-		url2 =         "http://domain.com/?var1&var2";
+		url1 = new URL("http://user:pass@domain.com/?var1=&var2=");
+		url2 =         "http://user:pass@domain.com/?var1&var2";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = new URL("http://domain.com/?var&");
-		url2 =         "http://domain.com/?var";
-		expect( minURL(url1,opts) ).to.equal(url2);
-
-		url1 = new URL("http://domain.com/?var&&");
-		url2 =         "http://domain.com/?var";
-		expect( minURL(url1,opts) ).to.equal(url2);
-
-		url1 = "http://domain.com/?=";
+		url1 = "http://user:pass@domain.com/?var&";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://domain.com/?var&=";
+		url1 = "http://user:pass@domain.com/?var&&";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://domain.com/??var";
+		url1 = "http://user:pass@domain.com/?=";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://domain.com/?var==value";
+		url1 = "http://user:pass@domain.com/?var&=";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://domain.com/";
+		url1 = "http://user:pass@domain.com/??var";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
+
+		url1 = "http://user:pass@domain.com/?var==value";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
+
+		url1 = "http://user:pass@domain.com/";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeQueryOddities = function", function()
+	it("removeQueryOddities = function", () =>
 	{
 		const opts = options({ removeQueryOddities:httpOnly });
 		let url1,url2;
 
-		url1 = new URL("http://domain.com/?");
-		url2 =         "http://domain.com/";
+		url1 = new URL("http://user:pass@domain.com/?");
+		url2 =         "http://user:pass@domain.com/";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "other://domain.com/?";
+		url1 = "other://user:pass@domain.com/?";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeRootTrailingSlash = false", function()
+	it("removeRootTrailingSlash = false", () =>
 	{
 		const opts = options();
-		const url1 = "http://www.domain.com:123/";
+		const url1 = "http://user:pass@www.domain.com:123/";
 		const url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeRootTrailingSlash = true", function()
+	it("removeRootTrailingSlash = true", () =>
 	{
 		const opts = options({ removeRootTrailingSlash:true });
 		let url1,url2;
-		
-		url1 = new URL("http://www.domain.com:123/");
-		url2 =         "http://www.domain.com:123";
+
+		url1 = new URL("http://user:pass@www.domain.com:123/");
+		url2 =         "http://user:pass@www.domain.com:123";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.domain.com:123//";
+		url1 = "http://user:pass@www.domain.com:123//";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
-		
-		url1 = new URL("http://www.domain.com:123/?query#hash");
-		url2 =         "http://www.domain.com:123?query#hash";
+
+		url1 = new URL("http://user:pass@www.domain.com:123/?query#hash");
+		url2 =         "http://user:pass@www.domain.com:123?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.domain.com:123/file.html?query#hash";
-		url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal(url1);
-		
-		url1 = "http://www.domain.com:123/dir/?query#hash";
-		url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal(url1);
-		
-		url1 = "http://www.domain.com:123/dir/file.html?query#hash";
+		url1 = "http://user:pass@www.domain.com:123/file.html?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://www.domain.com:123//?query#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://www.domain.com/www.domain.com/?query#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://www.ᄯᄯᄯ.ExAmPlE/?query#hash";
+		url1 = "http://user:pass@www.domain.com:123//?query#hash";
 		url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal("http://www.xn--brdaa.example?query#hash");
+		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("other://www.domain.com:123/?query#hash");
-		url2 =         "other://www.domain.com:123?query#hash";
+		url1 = "http://user:pass@www.domain.com/www.domain.com/?query#hash";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
+
+		url1 = "http://user:pass@www.ᄯᄯᄯ.ExAmPlE/?query#hash";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal("http://user:pass@www.xn--brdaa.example?query#hash");
+
+		url1 = new URL("other://user:pass@www.domain.com:123/?query#hash");
+		url2 =         "other://user:pass@www.domain.com:123?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
-		
+
 		url1 = new URL("file:\\\\\\C:\\");
 		url2 =         "file:///C:/";
 		expect( minURL(url1,opts) ).to.equal(url2);
@@ -855,15 +838,15 @@ describe("options", function()
 		url1 = "file:///C:/dir/?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
-		
+
 		url1 = "file:///C:/dir1/dir2/?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
-		
+
 		url1 = "file:///dir/?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
-		
+
 		url1 = "file:///dir1/dir2/?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
@@ -875,77 +858,77 @@ describe("options", function()
 
 
 
-	it("removeRootTrailingSlash = function", function()
+	it("removeRootTrailingSlash = function", () =>
 	{
 		const opts = options({ removeRootTrailingSlash:httpOnly });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/?query#hash");
-		url2 =         "http://www.domain.com:123?query#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/?query#hash");
+		url2 =         "http://user:pass@www.domain.com:123?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "other://www.domain.com:123/?query#hash";
+		url1 = "other://user:pass@www.domain.com:123/?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeTrailingSlash = false", function()
+	it("removeTrailingSlash = false", () =>
 	{
 		const opts = options();
-		const url1 = "http://www.domain.com:123/";
+		const url1 = "http://user:pass@www.domain.com:123/";
 		const url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeTrailingSlash = true", function()
+	it("removeTrailingSlash = true", () =>
 	{
 		const opts = options({ removeTrailingSlash:true });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/");
-		url2 =         "http://www.domain.com:123";
+		url1 = new URL("http://user:pass@www.domain.com:123/");
+		url2 =         "http://user:pass@www.domain.com:123";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.domain.com:123//";
-		url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal(url1);
-		
-		url1 = new URL("http://www.domain.com:123/?query#hash");
-		url2 =         "http://www.domain.com:123?query#hash";
-		expect( minURL(url1,opts) ).to.equal(url2);
-
-		url1 = "http://www.domain.com:123/file.html?query#hash";
-		url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal(url1);
-		
-		url1 = new URL("http://www.domain.com:123/dir/?query#hash");
-		url2 =         "http://www.domain.com:123/dir?query#hash";
-		expect( minURL(url1,opts) ).to.equal(url2);
-		
-		url1 = "http://www.domain.com:123/dir/file.html?query#hash";
+		url1 = "http://user:pass@www.domain.com:123//";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://www.domain.com:123/dir//?query#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/?query#hash");
+		url2 =         "http://user:pass@www.domain.com:123?query#hash";
+		expect( minURL(url1,opts) ).to.equal(url2);
+
+		url1 = "http://user:pass@www.domain.com:123/file.html?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("http://www.domain.com/www.domain.com/?query#hash");
-		url2 =         "http://www.domain.com/www.domain.com?query#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/?query#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.ᄯᄯᄯ.ExAmPlE/?query#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir/file.html?query#hash";
 		url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal("http://www.xn--brdaa.example?query#hash");
+		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("other://www.domain.com:123/dir/?query#hash");
-		url2 =         "other://www.domain.com:123/dir?query#hash";
+		url1 = "http://user:pass@www.domain.com:123/dir//?query#hash";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
+
+		url1 = new URL("http://user:pass@www.domain.com/www.domain.com/?query#hash");
+		url2 =         "http://user:pass@www.domain.com/www.domain.com?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
-		
+
+		url1 = "http://user:pass@www.ᄯᄯᄯ.ExAmPlE/?query#hash";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal("http://user:pass@www.xn--brdaa.example?query#hash");
+
+		url1 = new URL("other://user:pass@www.domain.com:123/dir/?query#hash");
+		url2 =         "other://user:pass@www.domain.com:123/dir?query#hash";
+		expect( minURL(url1,opts) ).to.equal(url2);
+
 		url1 = new URL("file:\\\\\\C:\\");
 		url2 =         "file:///C:";
 		expect( minURL(url1,opts) ).to.equal(url2);
@@ -953,15 +936,15 @@ describe("options", function()
 		url1 = new URL("file:///C:/dir/?query#hash");
 		url2 =         "file:///C:/dir?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
-		
+
 		url1 = new URL("file:///C:/dir1/dir2/?query#hash");
 		url2 =         "file:///C:/dir1/dir2?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
-		
+
 		url1 = new URL("file:///dir/?query#hash");
 		url2 =         "file:///dir?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
-		
+
 		url1 = new URL("file:///dir1/dir2/?query#hash");
 		url2 =         "file:///dir1/dir2?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
@@ -973,50 +956,50 @@ describe("options", function()
 
 
 
-	it("removeTrailingSlash = function", function()
+	it("removeTrailingSlash = function", () =>
 	{
 		const opts = options({ removeTrailingSlash:httpOnly });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com/dir/?query#hash");
-		url2 =         "http://www.domain.com/dir?query#hash";
+		url1 = new URL("http://user:pass@www.domain.com/dir/?query#hash");
+		url2 =         "http://user:pass@www.domain.com/dir?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "other://www.domain.com/dir/?query#hash";
+		url1 = "other://user:pass@www.domain.com/dir/?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeWWW = false", function()
+	it("removeWWW = false", () =>
 	{
 		const opts = options();
-		const url1 = "http://www.domain.com:123/dir/file.html?query#hash";
+		const url1 = "http://user:pass@www.domain.com:123/dir/file.html?query#hash";
 		const url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("removeWWW = true", function()
+	it("removeWWW = true", () =>
 	{
 		const opts = options({ removeWWW:true });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?query#hash");
-		url2 =         "http://domain.com:123/dir/file.html?query#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?query#hash");
+		url2 =         "http://user:pass@domain.com:123/dir/file.html?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.domain:123/dir/file.html?query#hash";
+		url1 = "http://user:pass@www.domain:123/dir/file.html?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://www.ᄯᄯᄯ.ExAmPlE:123/dir/file.html?query#hash";
+		url1 = "http://user:pass@www.ᄯᄯᄯ.ExAmPlE:123/dir/file.html?query#hash";
 		url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal("http://xn--brdaa.example:123/dir/file.html?query#hash");
+		expect( minURL(url2,opts) ).to.equal("http://user:pass@xn--brdaa.example:123/dir/file.html?query#hash");
 
-		url1 = "http://www2.domain.com:123/dir/file.html?query#hash";
+		url1 = "http://user:pass@www2.domain.com:123/dir/file.html?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
@@ -1024,80 +1007,80 @@ describe("options", function()
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("other://www.domain.com:123/dir/file.html?query#hash");
-		url2 =         "other://domain.com:123/dir/file.html?query#hash";
+		url1 = new URL("other://user:pass@www.domain.com:123/dir/file.html?query#hash");
+		url2 =         "other://user:pass@domain.com:123/dir/file.html?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 	});
 
 
 
-	it("removeWWW = function", function()
+	it("removeWWW = function", () =>
 	{
 		const opts = options({ removeWWW:httpOnly });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?query#hash");
-		url2 =         "http://domain.com:123/dir/file.html?query#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?query#hash");
+		url2 =         "http://user:pass@domain.com:123/dir/file.html?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "http://www.domain:123/dir/file.html?query#hash";
+		url1 = "http://user:pass@www.domain:123/dir/file.html?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "other://www.domain.com:123/dir/file.html?query#hash";
+		url1 = "other://user:pass@www.domain.com:123/dir/file.html?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("sortQueries = false", function()
+	it("sortQueries = false", () =>
 	{
 		const opts = options();
-		const url1 = "http://www.domain.com:123/dir/file.html?var1=value1&var2=value&var1=value2#hash";
+		const url1 = "http://user:pass@www.domain.com:123/dir/file.html?var1=value1&var2=value&var1=value2#hash";
 		const url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it_searchParamsOnly("sortQueries = true", function()
+	it("sortQueries = true", () =>
 	{
 		const opts = options({ sortQueries:true });
-		const url1 = new URL("http://www.domain.com:123/dir/file.html?var1=value1&var2=value&var1=value2#hash");
-		const url2 =         "http://www.domain.com:123/dir/file.html?var1=value1&var1=value2&var2=value#hash";
+		const url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?var1=value1&var2=value&var1=value2#hash");
+		const url2 =         "http://user:pass@www.domain.com:123/dir/file.html?var1=value1&var1=value2&var2=value#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 	});
 
 
 
-	it_searchParamsOnly("sortQueries = function", function()
+	it("sortQueries = function", () =>
 	{
 		const opts = options({ sortQueries:httpOnly });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?var1=value1&var2=value&var1=value2#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html?var1=value1&var1=value2&var2=value#hash";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/file.html?var1=value1&var2=value&var1=value2#hash");
+		url2 =         "http://user:pass@www.domain.com:123/dir/file.html?var1=value1&var1=value2&var2=value#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = "other://www.domain.com:123/dir/file.html?var1=value1&var2=value&var1=value2#hash";
+		url1 = "other://user:pass@www.domain.com:123/dir/file.html?var1=value1&var2=value&var1=value2#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
 
 
 
-	it("stringify = false", function()
+	it("stringify = false", () =>
 	{
 		const opts = options({ removeRootTrailingSlash:true, removeTrailingSlash:true, stringify:false });
 		let url1,url2;
-		
-		url1 = new URL("http://www.domain.com:123/");
+
+		url1 = new URL("http://user:pass@www.domain.com:123/");
 		url2 = minURL(new URL(url1), opts);
 		expect(url2).to.be.an.instanceOf(URL);
 		expect(url2).to.deep.equal(url1);
 
-		url1 = new URL("http://www.domain.com:123/dir/");
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/");
 		url2 = minURL(new URL(url1), opts);
 		expect(url2).to.be.an.instanceOf(URL);
 		expect(url2).to.deep.equal(url1);
@@ -1105,112 +1088,112 @@ describe("options", function()
 
 
 
-	it("stringify = true", function()
+	it("stringify = true", () =>
 	{
 		const opts = options({ removeRootTrailingSlash:true, removeTrailingSlash:true });
 		let url1,url2;
-		
-		url1 = new URL("http://www.domain.com:123/");
-		url2 =         "http://www.domain.com:123";
+
+		url1 = new URL("http://user:pass@www.domain.com:123/");
+		url2 =         "http://user:pass@www.domain.com:123";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = new URL("http://www.domain.com:123/dir/");
-		url2 =         "http://www.domain.com:123/dir";
+		url1 = new URL("http://user:pass@www.domain.com:123/dir/");
+		url2 =         "http://user:pass@www.domain.com:123/dir";
 		expect( minURL(url1,opts) ).to.equal(url2);
 	});
 
 
 
-	it("clone = false, removeWWW = true, stringify = false", function()
+	it("clone = false, removeWWW = true, stringify = false", () =>
 	{
 		const opts = options({ removeWWW:true, stringify:false });
-		const url = new URL("http://www.domain.com/");
+		const url = new URL("http://user:pass@www.domain.com/");
 		const result = minURL(url, opts);
 
 		expect(result).to.equal(url);
-		expect(result.href).to.equal("http://domain.com/");
+		expect(result.href).to.equal("http://user:pass@domain.com/");
 	});
 
 
 
-	it("clone = true, removeWWW = true, stringify = false", function()
+	it("clone = true, removeWWW = true, stringify = false", () =>
 	{
 		const opts = options({ clone:true, removeWWW:true, stringify:false });
-		const url = new URL("http://www.domain.com/");
+		const url = new URL("http://user:pass@www.domain.com/");
 		const result = minURL(url, opts);
 
 		expect(result).to.not.equal(url);
-		expect(result.href).to.equal("http://domain.com/");
+		expect(result.href).to.equal("http://user:pass@domain.com/");
 	});
 
 
 
-	describe("in careful profile", function()
+	describe("in careful profile", () =>
 	{
-		it_searchParamsOnly("works", function()
+		it("works", () =>
 		{
 			const opts = minURL.CAREFUL_PROFILE;
 			let url1,url2;
 
 			// plusQueries
 			// removeDefaultPort
-			// ~~removeDirectoryIndex~~
 			// removeEmptyHash
 			// ~~removeEmptyQueries~~
+			// ~~removeIndexFilename~~
 			// removeQueryOddities
 			// removeRootTrailingSlash
 			// ~~removeTrailingSlash~~
 			// ~~removeWWW~~
 			// ~~sortQueries~~
-			url1 = new URL("http://www.domain.com:80/?va%20r2=%20dir&var1=text&var3=#");
-			url2 =         "http://www.domain.com?va+r2=+dir&var1=text&var3";
+			url1 = new URL("http://user:pass@www.domain.com:80/?va%20r2=%20dir&var1=text&var3=#");
+			url2 =         "http://user:pass@www.domain.com?va+r2=+dir&var1=text&var3";
 			expect( minURL(url1,opts) ).to.equal(url2);
 
-			url1 = new URL("https://www.domain.com:443/?va%20r2=%20dir&var1=text&var3=#");
-			url2 =         "https://www.domain.com?va+r2=+dir&var1=text&var3";
+			url1 = new URL("https://user:pass@www.domain.com:443/?va%20r2=%20dir&var1=text&var3=#");
+			url2 =         "https://user:pass@www.domain.com?va+r2=+dir&var1=text&var3";
 			expect( minURL(url1,opts) ).to.equal(url2);
 
 			// plusQueries
 			// removeDefaultPort
-			// ~~removeDirectoryIndex~~
 			// removeEmptyHash
 			// ~~removeEmptyQueries~~
+			// ~~removeIndexFilename~~
 			// removeQueryOddities
 			// ~~removeRootTrailingSlash~~
 			// ~~removeTrailingSlash~~
 			// ~~removeWWW~~
 			// ~~sortQueries~~
-			url1 = new URL("http://www.domain.com:80/dir/?va%20r2=%20dir&var1=text&var3=#");
-			url2 =         "http://www.domain.com/dir/?va+r2=+dir&var1=text&var3";
+			url1 = new URL("http://user:pass@www.domain.com:80/dir/?va%20r2=%20dir&var1=text&var3=#");
+			url2 =         "http://user:pass@www.domain.com/dir/?va+r2=+dir&var1=text&var3";
 			expect( minURL(url1,opts) ).to.equal(url2);
 
-			url1 = new URL("https://www.domain.com:443/dir/?va%20r2=%20dir&var1=text&var3=#");
-			url2 =         "https://www.domain.com/dir/?va+r2=+dir&var1=text&var3";
+			url1 = new URL("https://user:pass@www.domain.com:443/dir/?va%20r2=%20dir&var1=text&var3=#");
+			url2 =         "https://user:pass@www.domain.com/dir/?va+r2=+dir&var1=text&var3";
 			expect( minURL(url1,opts) ).to.equal(url2);
 
 			// plusQueries
 			// removeDefaultPort
-			// ~~removeDirectoryIndex~~
 			// removeEmptyHash
 			// ~~removeEmptyQueries~~
+			// ~~removeIndexFilename~~
 			// removeQueryOddities
 			// ~~removeRootTrailingSlash~~
 			// ~~removeTrailingSlash~~
 			// ~~removeWWW~~
 			// ~~sortQueries~~
-			url1 = new URL("http://www.domain.com:80/dir/index.html?va%20r2=%20dir&var1=text&var3=#");
-			url2 =         "http://www.domain.com/dir/index.html?va+r2=+dir&var1=text&var3";
+			url1 = new URL("http://user:pass@www.domain.com:80/dir/index.html?va%20r2=%20dir&var1=text&var3=#");
+			url2 =         "http://user:pass@www.domain.com/dir/index.html?va+r2=+dir&var1=text&var3";
 			expect( minURL(url1,opts) ).to.equal(url2);
 
-			url1 = new URL("https://www.domain.com:443/dir/index.html?va%20r2=%20dir&var1=text&var3=#");
-			url2 =         "https://www.domain.com/dir/index.html?va+r2=+dir&var1=text&var3";
+			url1 = new URL("https://user:pass@www.domain.com:443/dir/index.html?va%20r2=%20dir&var1=text&var3=#");
+			url2 =         "https://user:pass@www.domain.com/dir/index.html?va+r2=+dir&var1=text&var3";
 			expect( minURL(url1,opts) ).to.equal(url2);
 
 			// plusQueries
 			// removeDefaultPort
-			// ~~removeDirectoryIndex~~
 			// removeEmptyHash
 			// ~~removeEmptyQueries~~
+			// ~~removeIndexFilename~~
 			// removeQueryOddities
 			// ~~removeRootTrailingSlash~~
 			// ~~removeTrailingSlash~~
@@ -1238,9 +1221,9 @@ describe("options", function()
 
 			// plusQueries
 			// ~~removeDefaultPort~~
-			// ~~removeDirectoryIndex~~
 			// removeEmptyHash
 			// removeEmptyQueries
+			// ~~removeIndexFilename~~
 			// removeQueryOddities
 			// ~~removeRootTrailingSlash~~
 			// ~~removeTrailingSlash~~
@@ -1252,69 +1235,69 @@ describe("options", function()
 
 			// ~~plusQueries~~
 			// ~~removeDefaultPort~~
-			// ~~removeDirectoryIndex~~
 			// ~~removeEmptyHash~~
 			// ~~removeEmptyQueries~~
+			// ~~removeIndexFilename~~
 			// removeQueryOddities
 			// removeRootTrailingSlash
 			// ~~removeTrailingSlash~~
 			// ~~removeWWW~~
 			// ~~sortQueries~~
-			url1 = new URL("other://www.domain.com:123/?");
-			url2 =         "other://www.domain.com:123";
+			url1 = new URL("other://user:pass@www.domain.com:123/?");
+			url2 =         "other://user:pass@www.domain.com:123";
 			expect( minURL(url1,opts) ).to.equal(url2);
 		});
 	});
 
 
 
-	function commonProfileTests(opts)
+	const commonProfileTests = opts =>
 	{
-		it_searchParamsOnly("works", function()
+		it("works", () =>
 		{
 			let url1,url2;
 
 			// plusQueries
 			// removeDefaultPort
-			// removeDirectoryIndex
 			// removeEmptyHash
 			// ~~removeEmptyQueries~~
+			// removeIndexFilename
 			// removeQueryOddities
 			// removeRootTrailingSlash
 			// ~~removeTrailingSlash~~
 			// removeWWW
 			// ~~sortQueries~~
-			url1 = new URL("http://www.domain.com:80/index.html?va%20r2=%20dir&var1=text&var3=#");
-			url2 =         "http://domain.com?va+r2=+dir&var1=text&var3";
+			url1 = new URL("http://user:pass@www.domain.com:80/index.html?va%20r2=%20dir&var1=text&var3=#");
+			url2 =         "http://user:pass@domain.com?va+r2=+dir&var1=text&var3";
 			expect( minURL(url1,opts) ).to.equal(url2);
 
-			url1 = new URL("https://www.domain.com:443/index.html?va%20r2=%20dir&var1=text&var3=#");
-			url2 =         "https://domain.com?va+r2=+dir&var1=text&var3";
+			url1 = new URL("https://user:pass@www.domain.com:443/index.html?va%20r2=%20dir&var1=text&var3=#");
+			url2 =         "https://user:pass@domain.com?va+r2=+dir&var1=text&var3";
 			expect( minURL(url1,opts) ).to.equal(url2);
 
 			// plusQueries
 			// removeDefaultPort
-			// removeDirectoryIndex
 			// removeEmptyHash
 			// ~~removeEmptyQueries~~
+			// removeIndexFilename
 			// removeQueryOddities
 			// ~~removeRootTrailingSlash~~
 			// ~~removeTrailingSlash~~
 			// removeWWW
 			// ~~sortQueries~~
-			url1 = new URL("http://www.domain.com:80/dir/index.html?va%20r2=%20dir&var1=text&var3=#");
-			url2 =         "http://domain.com/dir/?va+r2=+dir&var1=text&var3";
+			url1 = new URL("http://user:pass@www.domain.com:80/dir/index.html?va%20r2=%20dir&var1=text&var3=#");
+			url2 =         "http://user:pass@domain.com/dir/?va+r2=+dir&var1=text&var3";
 			expect( minURL(url1,opts) ).to.equal(url2);
 
-			url1 = new URL("https://www.domain.com:443/dir/index.html?va%20r2=%20dir&var1=text&var3=#");
-			url2 =         "https://domain.com/dir/?va+r2=+dir&var1=text&var3";
+			url1 = new URL("https://user:pass@www.domain.com:443/dir/index.html?va%20r2=%20dir&var1=text&var3=#");
+			url2 =         "https://user:pass@domain.com/dir/?va+r2=+dir&var1=text&var3";
 			expect( minURL(url1,opts) ).to.equal(url2);
 
 			// plusQueries
 			// removeDefaultPort
-			// ~~removeDirectoryIndex~~
 			// removeEmptyHash
 			// ~~removeEmptyQueries~~
+			// ~~removeIndexFilename~~
 			// removeQueryOddities
 			// ~~removeRootTrailingSlash~~
 			// ~~removeTrailingSlash~~
@@ -1342,9 +1325,9 @@ describe("options", function()
 
 			// plusQueries
 			// ~~removeDefaultPort~~
-			// ~~removeDirectoryIndex~~
 			// removeEmptyHash
 			// removeEmptyQueries
+			// ~~removeIndexFilename~~
 			// removeQueryOddities
 			// ~~removeRootTrailingSlash~~
 			// ~~removeTrailingSlash~~
@@ -1356,91 +1339,84 @@ describe("options", function()
 
 			// ~~plusQueries~~
 			// ~~removeDefaultPort~~
-			// ~~removeDirectoryIndex~~
 			// ~~removeEmptyHash~~
 			// ~~removeEmptyQueries~~
+			// ~~removeIndexFilename~~
 			// removeQueryOddities
 			// removeRootTrailingSlash
 			// ~~removeTrailingSlash~~
 			// ~~removeWWW~~
 			// ~~sortQueries~~
-			url1 = new URL("other://www.domain.com:123/?");
-			url2 =         "other://www.domain.com:123";
+			url1 = new URL("other://user:pass@www.domain.com:123/?");
+			url2 =         "other://user:pass@www.domain.com:123";
 			expect( minURL(url1,opts) ).to.equal(url2);
 		});
-	}
 
 
 
-	describe("in common profile", function()
-	{
-		commonProfileTests(minURL.COMMON_PROFILE);
-
-
-
-		describe("with URL implementations lacking searchParams", function()
+		describe("with URL implementations lacking searchParams", () =>
 		{
-			const opts = { clone:false };  // avoids using Node's `URL` on >=7.x
+			const opts2 = { ...opts, clone:false };  // avoids using Node's `URL` on >=7.x
 			let IncompleteURL;
 
-			before(() => IncompleteURL = requireIncompleteURL(false));
+			before(() => IncompleteURL = customizeURL({ urlExclusions:["searchParams"] }).IncompleteURL);
 
-			it("works", function()
+			it("works", () =>
 			{
 				// plusQueries
 				// ~~removeDefaultPort~~
-				// ~~removeDirectoryIndex~~
 				// removeEmptyHash
 				// removeEmptyQueries
+				// ~~removeIndexFilename~~
 				// removeQueryOddities
 				// ~~removeRootTrailingSlash~~
 				// ~~removeTrailingSlash~~
 				// ~~removeWWW~~
 				// sortQueries
 				const url1 = new IncompleteURL("mailto:email@www.domain.com:123?subject=hello%20world&cc=user@domain.com&body=&#");
-				const url2 =                   "mailto:email@www.domain.com:123?subject=hello+world&cc=user@domain.com&body";
-				expect( minURL(url1,opts) ).to.equal(url2);
+				const url2 =                   "mailto:email@www.domain.com:123?subject=hello+world&cc=user@domain.com&body&";
+				expect( minURL(url1,opts2) ).to.equal(url2);
 			});
 		});
 
 
 
-		describe("with URL implementations lacking searchParams.sort", function()
+		describe("with URL implementations lacking searchParams::sort", () =>
 		{
-			const opts = { clone:false };  // avoids using Node's `URL` on >=7.x
+			const opts2 = { ...opts, clone:false };  // avoids using Node's `URL` on >=7.x
 			let IncompleteURL;
 
-			function parseURL(url)
-			{
-				url = new IncompleteURL(url);
-				url.search = url.search;
-				return url;
-			}
+			before(() => IncompleteURL = customizeURL({ paramsExclusions:["sort"] }).IncompleteURL);
 
-			before(() => IncompleteURL = requireIncompleteURL(true));
-
-			it("works", function()
+			it("works", () =>
 			{
 				// plusQueries
 				// ~~removeDefaultPort~~
-				// ~~removeDirectoryIndex~~
 				// removeEmptyHash
 				// removeEmptyQueries
+				// ~~removeIndexFilename~~
 				// removeQueryOddities
 				// ~~removeRootTrailingSlash~~
 				// ~~removeTrailingSlash~~
 				// ~~removeWWW~~
 				// sortQueries
-				const url1 = new parseURL("mailto:email@www.domain.com:123?subject=hello%20world&cc=user@domain.com&body=&#");
-				const url2 =              "mailto:email@www.domain.com:123?subject=hello+world&cc=user%40domain.com";
-				expect( minURL(url1,opts) ).to.equal(url2);
+				const url1 = new IncompleteURL("mailto:email@www.domain.com:123?subject=hello%20world&cc=user@domain.com&body=&#");
+				const url2 =                   "mailto:email@www.domain.com:123?subject=hello+world&cc=user%40domain.com";
+				expect( minURL(url1,opts2) ).to.equal(url2);
 			});
 		});
+	}
+
+
+
+	describe("in common profile", () =>
+	{
+		commonProfileTests(minURL.COMMON_PROFILE);
 	});
 
 
 
-	describe("in default profile", function()
+	describe("in default profile", () =>
 	{
 		commonProfileTests();
 	});

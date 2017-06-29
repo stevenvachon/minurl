@@ -1,46 +1,55 @@
 {
   "name": "minurl",
   "description": "Reduce and normalize the components of a URL.",
-  "version": "1.0.0-alpha13",
+  "version": "1.0.0-alpha14",
   "license": "MIT",
   "author": "Steven Vachon <contact@svachon.com> (https://www.svachon.com/)",
-  "main": "lib/minurl",
-  "repository": "stevenvachon/minurl",
+  "repository": "github:stevenvachon/minurl",
   "dependencies": {
-    "any-match": "^1.0.1",
-    "cloneurl": "^1.0.0-alpha3",
-    "deep-freeze-node": "^1.1.2",
+    "any-match": "^2.0.0",
+    "cloneurl": "^2.0.0",
+    "deep-freeze-node": "^1.1.3",
     "defined": "^1.0.0",
     "evaluate-value": "^1.0.2",
-    "isurl": "^1.0.0-alpha5",
+    "isurl": "^4.0.0",
     "strip-www": "^1.0.0"
   },
   "devDependencies": {
-    "babel-cli": "^6.24.1",
-    "babel-preset-es2015": "^6.24.1",
-    "babelify": "^7.3.0",
-    "browserify": "^14.4.0",
-    "chai": "^4.0.1",
-    "coveralls": "^2.13.1",
-    "decache": "^4.1.0",
-    "gzip-size-cli": "^2.0.0",
-    "mocha": "^3.4.2",
-    "nyc": "^11.0.2",
-    "uglify-js": "^3.0.15",
-    "universal-url": "^1.0.0-alpha",
-    "url-search-params": "~0.7.0",
-    "whatwg-url": "^5.0.0"
+    "@babel/core": "^7.2.2",
+    "@babel/preset-env": "^7.2.3",
+    "babelify": "^10.0.0",
+    "browserify": "^16.2.3",
+    "chai": "^4.2.0",
+    "coveralls": "^3.0.2",
+    "gzip-size-cli": "^3.0.0",
+    "incomplete-url": "^4.0.0",
+    "mocha": "^5.2.0",
+    "npm-watch": "~0.5.0",
+    "nyc": "^13.1.0",
+    "terser": "^3.14.1",
+    "universal-url": "^2.0.0"
   },
   "engines": {
-    "node": ">= 4"
+    "node": ">= 8"
   },
   "scripts": {
     "ci": "npm run test && nyc report --reporter=text-lcov | coveralls",
-    "posttest": "nyc report --reporter=html && browserify lib/minurl --global-transform [ babelify --presets [ es2015 ] ] --standalone minURL | uglifyjs --compress --mangle | gzip-size",
-    "pretest": "babel src --out-dir=lib --presets=es2015 --source-maps=true",
-    "test": "nyc --reporter=text-summary mocha test --reporter=spec --check-leaks --bail"
+    "posttest": "nyc report --reporter=html && browserify index.js --global-transform [ babelify --presets [ @babel/env ] ] --standalone=minURL | terser --compress --mangle | gzip-size",
+    "test": "nyc --reporter=text-summary mocha test --check-leaks --bail",
+    "watch": "npm-watch test"
   },
-  "files": ["lib/minurl.js"],
+  "watch": {
+    "test": {
+      "inherit": true,
+      "patterns": [
+        "index.js",
+        "test.js"
+      ]
+    }
+  },
+  "files": [
+    "index.js"
+  ],
   "keywords": [
     "beautifier",
     "beautify",
