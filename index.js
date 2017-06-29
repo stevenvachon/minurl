@@ -11,14 +11,43 @@ const defaultPorts = { "ftps:":990, "git:":9418, "scp:":22, "sftp:":22, "ssh:":2
 const directoryIndexes = ["index.html"];
 const emptyQueryValue = /([^&\?])=&/g;
 const encodedSpace = /%20/g;
-const multipleAmpersand = /&+/g;
 const multipleSlashes = /\/{2,}/g;
 const queryNames = [];
-const trailingAmpersand = /&$/;
 const trailingEquals = /([^&\?])=$/;
 const trailingQuestion = /\?#?(?:.+)?$/;
 
-const carefulProfile = 
+
+
+const defaultValue = (customOptions, optionName, ...args) =>
+{
+	const defaultOption = evaluateValue(commonProfile[optionName], ...args);
+
+	if (customOptions != null)
+	{
+		return defined( evaluateValue(customOptions[optionName], ...args), defaultOption );
+	}
+	else
+	{
+		return defaultOption;
+	}
+};
+
+
+
+const filterCommon = url => url.protocol==="http:" || url.protocol==="https:";
+
+const filterSafe = url => url.protocol === "mailto:";
+
+
+
+const filterSpecCompliant = url =>
+{
+	return filterSafe(url) || url.protocol==="http:" || url.protocol==="https:" || url.protocol==="ws:" || url.protocol==="wss:";
+};
+
+
+
+const carefulProfile =
 {
 	clone: true,
 	defaultPorts,
@@ -42,7 +71,7 @@ const carefulProfile =
 	stringify: true
 };
 
-const commonProfile = 
+const commonProfile =
 {
 	clone: true,
 	defaultPorts,
@@ -68,44 +97,7 @@ const commonProfile =
 
 
 
-function defaultValue(customOptions, optionName, ...args)
-{
-	const defaultOption = evaluateValue(commonProfile[optionName], ...args);
-
-	if (customOptions != null)
-	{
-		return defined( evaluateValue(customOptions[optionName], ...args), defaultOption );
-	}
-	else
-	{
-		return defaultOption;
-	}
-}
-
-
-
-function filterCommon(url)
-{
-	return url.protocol==="http:" || url.protocol==="https:";
-}
-
-
-
-function filterSafe(url)
-{
-	return url.protocol === "mailto:";
-}
-
-
-
-function filterSpecCompliant(url)
-{
-	return filterSafe(url) || url.protocol==="http:" || url.protocol==="https:" || url.protocol==="ws:" || url.protocol==="wss:";
-}
-
-
-
-function minURL(url, options)
+const minURL = (url, options) =>
 {
 	if (!isURL.lenient(url))
 	{
@@ -156,7 +148,7 @@ function minURL(url, options)
 			url.hash = "";
 		}
 	}
-	
+
 	if (url.search !== "")
 	{
 		// If not a partial implementation
@@ -187,7 +179,7 @@ function minURL(url, options)
 
 				// Rebuild params
 				// NOTE :: `searchParams.delete()` will not remove individual values
-				params.filter( function([name, value])
+				params.filter(([name, value]) =>
 				{
 					const isRemovableQuery      = removeEmptyQueries     && name==="" && value==="";
 					const isRemovableQueryName  = removeEmptyQueryNames  && name==="" && value!=="";
@@ -202,7 +194,7 @@ function minURL(url, options)
 			{
 				const queryNames = defaultValue(options, "queryNames");
 
-				Array.from(url.searchParams.keys()).forEach( function(param)
+				Array.from(url.searchParams.keys()).forEach(param =>
 				{
 					if (anyMatch(param, queryNames))
 					{
@@ -215,30 +207,22 @@ function minURL(url, options)
 
 	if (defaultValue(options, "removeQueryOddities", url))
 	{
-		if (url.search === "")
-		{
-			if (trailingQuestion.test(url.href))
-			{
-				// Force `href` to update
-				url.search = "";
-			}
-		}
-		else
+		if (url.search !== "")
 		{
 			url.search = url.search
 			.replace(emptyQueryValue, "$1&")
-			.replace(multipleAmpersand, "&")  // TODO :: remove when "whatwg-url" has `URLSearchParams`
-			.replace(trailingAmpersand, "")
 			.replace(trailingEquals, "$1");
+		}
+		else if (trailingQuestion.test(url.href))
+		{
+			// Force `href` to update
+			url.search = "";
 		}
 	}
 
-	if (url.search !== "")
+	if (url.search!=="" && defaultValue(options, "plusQueries", url))
 	{
-		if (defaultValue(options, "plusQueries", url))
-		{
-			url.search = url.search.replace(encodedSpace, "+");
-		}
+		url.search = url.search.replace(encodedSpace, "+");
 	}
 
 	if (defaultValue(options, "removeWWW", url))
@@ -266,9 +250,9 @@ function minURL(url, options)
 			return url.href.replace(url.host + url.pathname, url.host);
 		}
 	}
-	
+
 	return url.href;
-}
+};
 
 
 

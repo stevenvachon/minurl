@@ -1,11 +1,11 @@
-# minurl [![NPM Version][npm-image]][npm-url] ![File Size][filesize-image] [![Build Status][travis-image]][travis-url] [![Coverage Status][coveralls-image]][coveralls-url] [![Dependency Status][david-image]][david-url]
+# minurl [![NPM Version][npm-image]][npm-url] ![File Size][filesize-image] [![Build Status][travis-image]][travis-url] [![Coverage Status][coveralls-image]][coveralls-url] [![Dependency Monitor][greenkeeper-image]][greenkeeper-url]
 
-> Reduce and normalize the components of a [WHATWG URL](https://url.spec.whatwg.org).
+> Reduce and normalize the components of a WHATWG [`URL`](https://developer.mozilla.org/en/docs/Web/API/URL).
 
 
 ## Installation
 
-[Node.js](http://nodejs.org/) `>= 4` is required. To install, type this at the command line:
+[Node.js](http://nodejs.org/) `>= 6` is required. To install, type this at the command line:
 ```shell
 npm install minurl
 ```
@@ -182,10 +182,10 @@ const custom = extend(true, {}, minURL.COMMON_PROFILE, { directoryIndexes:['inde
 
 [npm-image]: https://img.shields.io/npm/v/minurl.svg
 [npm-url]: https://npmjs.org/package/minurl
-[filesize-image]: https://img.shields.io/badge/size-2.4kB%20gzipped-blue.svg
+[filesize-image]: https://img.shields.io/badge/size-2.5kB%20gzipped-blue.svg
 [travis-image]: https://img.shields.io/travis/stevenvachon/minurl.svg
 [travis-url]: https://travis-ci.org/stevenvachon/minurl
 [coveralls-image]: https://img.shields.io/coveralls/stevenvachon/minurl.svg
 [coveralls-url]: https://coveralls.io/github/stevenvachon/minurl
-[david-image]: https://img.shields.io/david/stevenvachon/minurl.svg
-[david-url]: https://david-dm.org/stevenvachon/minurl
+[greenkeeper-image]: https://badges.greenkeeper.io/stevenvachon/minurl.svg
+[greenkeeper-url]: https://greenkeeper.io/

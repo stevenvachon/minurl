@@ -1,26 +1,18 @@
 "use strict";
-const decache = require("decache");
-const expect = require("chai").expect;
-const minURL = require("./lib/minurl");
-const universalURL = require("universal-url");
-
-const describe_searchParamsOnly = universalURL.supportsSearchParams ? describe : describe.skip;
-const it_searchParamsOnly       = universalURL.supportsSearchParams ? it : it.skip;
-
-const URL = universalURL.URL;
+const {before, describe, it} = require("mocha");
+const customizeURL = require("incomplete-url");
+const {expect} = require("chai");
+const minURL = require("./");
+const {URL, URLSearchParams} = require("universal-url");
 
 
 
-function httpOnly(url)
-{
-	return url.protocol==="http:" || url.protocol==="https:";
-}
+const httpOnly = url => url.protocol==="http:" || url.protocol==="https:";
 
 
 
-function options(overrides)
-{
-	const resetOptions =
+const options = overrides => Object.assign
+(
 	{
 		clone: false,
 		defaultPorts: {},
@@ -42,59 +34,9 @@ function options(overrides)
 		removeWWW: false,
 		sortQueries: false,
 		stringify: true  // special
-	};
-
-	return Object.assign(resetOptions, overrides);
-}
-
-
-
-function requireIncompleteURL(searchParams)
-{
-	decache("whatwg-url");  // avoid mutating other instances
-	const IncompleteURL = require("whatwg-url").URL;
-
-	if (searchParams)
-	{
-		const IncompleteURLSearchParams = require("url-search-params");
-
-		const paramsProto = IncompleteURLSearchParams.prototype;
-
-		paramsProto.__org_append = paramsProto.append;
-		paramsProto.append = function()
-		{
-			paramsProto.__org_append.apply(this, arguments);
-			this.__URL.search = this.toString();
-		};
-
-		const urlProto = IncompleteURL.prototype;
-		const searchSetSuper = Object.getOwnPropertyDescriptor(urlProto, "search").set;
-
-		Object.defineProperty(urlProto, "search", 
-		{
-			set: function(newValue)
-			{
-				this.__searchParams = new IncompleteURLSearchParams(newValue);
-				this.__searchParams.__URL = this;
-				searchSetSuper.apply(this, [newValue]);
-			}
-		});
-
-		Object.defineProperty(urlProto, "searchParams", 
-		{
-			get: function()
-			{
-				return this.__searchParams;
-			},
-			set: function(newValue)
-			{
-				this.__searchParams = newValue;
-			}
-		});
-	}
-
-	return IncompleteURL;
-}
+	},
+	overrides
+);
 
 
 
@@ -315,7 +257,7 @@ describe("options", function()
 		const url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 	});
-	
+
 
 
 	it("removeEmptyDirectoryNames = true", function()
@@ -418,7 +360,7 @@ describe("options", function()
 
 
 
-	it_searchParamsOnly("removeEmptyQueries = true", function()
+	it("removeEmptyQueries = true", function()
 	{
 		const opts = options({ removeEmptyQueries:true });
 		let url1,url2;
@@ -462,7 +404,7 @@ describe("options", function()
 
 
 
-	it_searchParamsOnly("removeEmptyQueries = function", function()
+	it("removeEmptyQueries = function", function()
 	{
 		const opts = options({ removeEmptyQueries:httpOnly });
 		let url1,url2;
@@ -488,7 +430,7 @@ describe("options", function()
 
 
 
-	it_searchParamsOnly("removeEmptyQueryNames = true", function()
+	it("removeEmptyQueryNames = true", function()
 	{
 		const opts = options({ removeEmptyQueryNames:true });
 		let url1,url2;
@@ -532,7 +474,7 @@ describe("options", function()
 
 
 
-	it_searchParamsOnly("removeEmptyQueryNames = function", function()
+	it("removeEmptyQueryNames = function", function()
 	{
 		const opts = options({ removeEmptyQueryNames:httpOnly });
 		let url1,url2;
@@ -558,7 +500,7 @@ describe("options", function()
 
 
 
-	it_searchParamsOnly("removeEmptyQueryValues = true", function()
+	it("removeEmptyQueryValues = true", function()
 	{
 		const opts = options({ removeEmptyQueryValues:true });
 		let url1,url2;
@@ -602,7 +544,7 @@ describe("options", function()
 
 
 
-	it_searchParamsOnly("removeEmptyQueryValues = function", function()
+	it("removeEmptyQueryValues = function", function()
 	{
 		const opts = options({ removeEmptyQueryValues:httpOnly });
 		let url1,url2;
@@ -678,7 +620,7 @@ describe("options", function()
 
 
 
-	it_searchParamsOnly("removeQueryNames = true", function()
+	it("removeQueryNames = true", function()
 	{
 		let opts,url1,url2;
 
@@ -688,20 +630,20 @@ describe("options", function()
 		expect( minURL(url1,opts) ).to.equal(url2);
 
 		opts = options({ queryNames:[/^var\d+$/], removeQueryNames:true });
-		url1 = new URL("http://www.domain.com:123/dir/file.html?var1=value1&var1=value2&var2=value#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html#hash";
+		url1 = new URL("http://www.domain.com:123/dir/file.html?var1=value1&var1=value2&var2=value&var=value#hash");
+		url2 =         "http://www.domain.com:123/dir/file.html?var=value#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 	});
 
 
 
-	it_searchParamsOnly("removeQueryNames = function", function()
+	it("removeQueryNames = function", function()
 	{
-		const opts = options({ queryNames:["query"], removeQueryNames:httpOnly });
+		const opts = options({ queryNames:["var1"], removeQueryNames:httpOnly });
 		let url1,url2;
 
-		url1 = new URL("http://www.domain.com:123/dir/file.html?query#hash");
-		url2 =         "http://www.domain.com:123/dir/file.html#hash";
+		url1 = new URL("http://www.domain.com:123/dir/file.html?var1=value&var2=value#hash");
+		url2 =         "http://www.domain.com:123/dir/file.html?var2=value#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
 		url1 = "other://www.domain.com:123/dir/file.html?query#hash";
@@ -746,13 +688,13 @@ describe("options", function()
 		url2 =         "http://domain.com/?var1&var2";
 		expect( minURL(url1,opts) ).to.equal(url2);
 
-		url1 = new URL("http://domain.com/?var&");
-		url2 =         "http://domain.com/?var";
-		expect( minURL(url1,opts) ).to.equal(url2);
+		url1 = "http://domain.com/?var&";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = new URL("http://domain.com/?var&&");
-		url2 =         "http://domain.com/?var";
-		expect( minURL(url1,opts) ).to.equal(url2);
+		url1 = "http://domain.com/?var&&";
+		url2 = new URL(url1);
+		expect( minURL(url2,opts) ).to.equal(url1);
 
 		url1 = "http://domain.com/?=";
 		url2 = new URL(url1);
@@ -807,7 +749,7 @@ describe("options", function()
 	{
 		const opts = options({ removeRootTrailingSlash:true });
 		let url1,url2;
-		
+
 		url1 = new URL("http://www.domain.com:123/");
 		url2 =         "http://www.domain.com:123";
 		expect( minURL(url1,opts) ).to.equal(url2);
@@ -815,7 +757,7 @@ describe("options", function()
 		url1 = "http://www.domain.com:123//";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
-		
+
 		url1 = new URL("http://www.domain.com:123/?query#hash");
 		url2 =         "http://www.domain.com:123?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
@@ -823,11 +765,11 @@ describe("options", function()
 		url1 = "http://www.domain.com:123/file.html?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
-		
+
 		url1 = "http://www.domain.com:123/dir/?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
-		
+
 		url1 = "http://www.domain.com:123/dir/file.html?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
@@ -847,7 +789,7 @@ describe("options", function()
 		url1 = new URL("other://www.domain.com:123/?query#hash");
 		url2 =         "other://www.domain.com:123?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
-		
+
 		url1 = new URL("file:\\\\\\C:\\");
 		url2 =         "file:///C:/";
 		expect( minURL(url1,opts) ).to.equal(url2);
@@ -855,15 +797,15 @@ describe("options", function()
 		url1 = "file:///C:/dir/?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
-		
+
 		url1 = "file:///C:/dir1/dir2/?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
-		
+
 		url1 = "file:///dir/?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
-		
+
 		url1 = "file:///dir1/dir2/?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
@@ -913,7 +855,7 @@ describe("options", function()
 		url1 = "http://www.domain.com:123//";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
-		
+
 		url1 = new URL("http://www.domain.com:123/?query#hash");
 		url2 =         "http://www.domain.com:123?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
@@ -921,11 +863,11 @@ describe("options", function()
 		url1 = "http://www.domain.com:123/file.html?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
-		
+
 		url1 = new URL("http://www.domain.com:123/dir/?query#hash");
 		url2 =         "http://www.domain.com:123/dir?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
-		
+
 		url1 = "http://www.domain.com:123/dir/file.html?query#hash";
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
@@ -945,7 +887,7 @@ describe("options", function()
 		url1 = new URL("other://www.domain.com:123/dir/?query#hash");
 		url2 =         "other://www.domain.com:123/dir?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
-		
+
 		url1 = new URL("file:\\\\\\C:\\");
 		url2 =         "file:///C:";
 		expect( minURL(url1,opts) ).to.equal(url2);
@@ -953,15 +895,15 @@ describe("options", function()
 		url1 = new URL("file:///C:/dir/?query#hash");
 		url2 =         "file:///C:/dir?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
-		
+
 		url1 = new URL("file:///C:/dir1/dir2/?query#hash");
 		url2 =         "file:///C:/dir1/dir2?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
-		
+
 		url1 = new URL("file:///dir/?query#hash");
 		url2 =         "file:///dir?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
-		
+
 		url1 = new URL("file:///dir1/dir2/?query#hash");
 		url2 =         "file:///dir1/dir2?query#hash";
 		expect( minURL(url1,opts) ).to.equal(url2);
@@ -1061,7 +1003,7 @@ describe("options", function()
 
 
 
-	it_searchParamsOnly("sortQueries = true", function()
+	it("sortQueries = true", function()
 	{
 		const opts = options({ sortQueries:true });
 		const url1 = new URL("http://www.domain.com:123/dir/file.html?var1=value1&var2=value&var1=value2#hash");
@@ -1071,7 +1013,7 @@ describe("options", function()
 
 
 
-	it_searchParamsOnly("sortQueries = function", function()
+	it("sortQueries = function", function()
 	{
 		const opts = options({ sortQueries:httpOnly });
 		let url1,url2;
@@ -1091,7 +1033,7 @@ describe("options", function()
 	{
 		const opts = options({ removeRootTrailingSlash:true, removeTrailingSlash:true, stringify:false });
 		let url1,url2;
-		
+
 		url1 = new URL("http://www.domain.com:123/");
 		url2 = minURL(new URL(url1), opts);
 		expect(url2).to.be.an.instanceOf(URL);
@@ -1109,7 +1051,7 @@ describe("options", function()
 	{
 		const opts = options({ removeRootTrailingSlash:true, removeTrailingSlash:true });
 		let url1,url2;
-		
+
 		url1 = new URL("http://www.domain.com:123/");
 		url2 =         "http://www.domain.com:123";
 		expect( minURL(url1,opts) ).to.equal(url2);
@@ -1147,7 +1089,7 @@ describe("options", function()
 
 	describe("in careful profile", function()
 	{
-		it_searchParamsOnly("works", function()
+		it("works", function()
 		{
 			const opts = minURL.CAREFUL_PROFILE;
 			let url1,url2;
@@ -1270,7 +1212,7 @@ describe("options", function()
 
 	function commonProfileTests(opts)
 	{
-		it_searchParamsOnly("works", function()
+		it("works", function()
 		{
 			let url1,url2;
 
@@ -1383,7 +1325,7 @@ describe("options", function()
 			const opts = { clone:false };  // avoids using Node's `URL` on >=7.x
 			let IncompleteURL;
 
-			before(() => IncompleteURL = requireIncompleteURL(false));
+			before(() => IncompleteURL = customizeURL({ noSearchParams:true }).IncompleteURL);
 
 			it("works", function()
 			{
@@ -1398,7 +1340,7 @@ describe("options", function()
 				// ~~removeWWW~~
 				// sortQueries
 				const url1 = new IncompleteURL("mailto:email@www.domain.com:123?subject=hello%20world&cc=user@domain.com&body=&#");
-				const url2 =                   "mailto:email@www.domain.com:123?subject=hello+world&cc=user@domain.com&body";
+				const url2 =                   "mailto:email@www.domain.com:123?subject=hello+world&cc=user@domain.com&body&";
 				expect( minURL(url1,opts) ).to.equal(url2);
 			});
 		});
@@ -1407,17 +1349,11 @@ describe("options", function()
 
 		describe("with URL implementations lacking searchParams.sort", function()
 		{
+			// TODO :: remove these options?
 			const opts = { clone:false };  // avoids using Node's `URL` on >=7.x
 			let IncompleteURL;
 
-			function parseURL(url)
-			{
-				url = new IncompleteURL(url);
-				url.search = url.search;
-				return url;
-			}
-
-			before(() => IncompleteURL = requireIncompleteURL(true));
+			before(() => IncompleteURL = customizeURL({ noSort:true }).IncompleteURL);
 
 			it("works", function()
 			{
@@ -1431,8 +1367,8 @@ describe("options", function()
 				// ~~removeTrailingSlash~~
 				// ~~removeWWW~~
 				// sortQueries
-				const url1 = new parseURL("mailto:email@www.domain.com:123?subject=hello%20world&cc=user@domain.com&body=&#");
-				const url2 =              "mailto:email@www.domain.com:123?subject=hello+world&cc=user%40domain.com";
+				const url1 = new IncompleteURL("mailto:email@www.domain.com:123?subject=hello%20world&cc=user@domain.com&body=&#");
+				const url2 =                   "mailto:email@www.domain.com:123?subject=hello+world&cc=user%40domain.com";
 				expect( minURL(url1,opts) ).to.equal(url2);
 			});
 		});
