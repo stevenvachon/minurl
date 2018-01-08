@@ -6,7 +6,7 @@
   "author": "Steven Vachon <contact@svachon.com> (https://www.svachon.com/)",
   "repository": "stevenvachon/minurl",
   "dependencies": {
-    "any-match": "^1.0.1",
+    "any-match": "^2.0.0",
     "cloneurl": "^1.0.0",
     "deep-freeze-node": "^1.1.2",
     "defined": "^1.0.0",
