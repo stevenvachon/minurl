@@ -20,7 +20,7 @@
     "browserify": "^14.4.0",
     "chai": "^4.0.2",
     "coveralls": "^2.13.1",
-    "gzip-size-cli": "^2.0.0",
+    "gzip-size-cli": "^3.0.0",
     "incomplete-url": "^1.0.2",
     "mocha": "^3.4.2",
     "nyc": "^11.0.3",
