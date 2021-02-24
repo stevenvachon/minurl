@@ -3,7 +3,6 @@ const {before, describe, it} = require("mocha");
 const customizeURL = require("incomplete-url");
 const {expect} = require("chai");
 const minURL = require("./");
-const {URL, URLSearchParams} = require("universal-url");
 
 
 
@@ -1001,9 +1000,9 @@ describe("options", () =>
 		url2 = new URL(url1);
 		expect( minURL(url2,opts) ).to.equal(url1);
 
-		url1 = "http://user:pass@www.ᄯᄯᄯ.ExAmPlE:123/dir/file.html?query#hash";
+		url1 = "http://user:pass@www.ᄯᄯᄯ.ExAmPlE.com:123/dir/file.html?query#hash";
 		url2 = new URL(url1);
-		expect( minURL(url2,opts) ).to.equal("http://user:pass@xn--brdaa.example:123/dir/file.html?query#hash");
+		expect( minURL(url2,opts) ).to.equal("http://user:pass@xn--brdaa.example.com:123/dir/file.html?query#hash");
 
 		url1 = "http://user:pass@www2.domain.com:123/dir/file.html?query#hash";
 		url2 = new URL(url1);

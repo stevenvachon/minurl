@@ -1,20 +1,19 @@
 "use strict";
 const anyMatch = require("any-match");
-const cloneURL = require("cloneurl");
 const deepFreeze = require("deep-freeze-node");
-const defined = require("defined");
 const evaluateValue = require("evaluate-value");
 const isURL = require("isurl");
 const stripWWW = require("strip-www");
 
 const defaultPorts = { "ftps:":990, "git:":9418, "scp:":22, "sftp:":22, "ssh:":22 };
-const emptyQueryValue = /([^&\?])=&/g;
-const encodedSpace = /%20/g;
 const indexFilenames = ["index.html"];
-const multipleSlashes = /\/{2,}/g;
 const queryNames = [];
-const trailingEquals = /([^&\?])=$/;
-const trailingQuestion = /\?#?(?:.+)?$/;
+
+const EMPTY_QUERY_VALUE = /([^&\?])=&/g;
+const ENCODED_SPACE = /%20/g;
+const MULTIPLE_SLASHES = /\/{2,}/g;
+const TRAILING_EQUALS = /([^&\?])=$/;
+const TRAILING_QUESTION = /\?#?(?:.+)?$/;
 
 
 
@@ -22,14 +21,7 @@ const defaultValue = (customOptions, optionName, ...args) =>
 {
 	const defaultOption = evaluateValue(COMMON_PROFILE[optionName], ...args);
 
-	if (customOptions != null)
-	{
-		return defined( evaluateValue(customOptions[optionName], ...args), defaultOption );
-	}
-	else
-	{
-		return defaultOption;
-	}
+	return evaluateValue(customOptions?.[optionName], ...args) ?? defaultOption;
 };
 
 
@@ -108,7 +100,7 @@ const minURL = (url, options) =>
 
 	if (defaultValue(options, "clone", url))
 	{
-		url = cloneURL(url);
+		url = new URL(url);
 	}
 
 	if (defaultValue(options, "removeAuth", url))
@@ -141,7 +133,7 @@ const minURL = (url, options) =>
 
 	if (defaultValue(options, "removeEmptySegmentNames", url))
 	{
-		url.pathname = url.pathname.replace(multipleSlashes, "/");
+		url.pathname = url.pathname.replace(MULTIPLE_SLASHES, "/");
 	}
 
 	if (defaultValue(options, "removeHash", url))
@@ -181,12 +173,12 @@ const minURL = (url, options) =>
 				const params = Array.from(url.searchParams);
 
 				// Clear all params
-				// TODO :: construct a new `URLSearchParams` instance when feasible, to avoid mutliple re-stringifcations
-				// NOTE :: https://github.com/nodejs/node/issues/10481
+				// @todo construct a new `URLSearchParams` instance when feasible, to avoid mutliple re-stringifcations
+				// https://github.com/nodejs/node/issues/10481
 				url.search = "";
 
 				// Rebuild params
-				// NOTE :: `searchParams.delete()` will not remove individual values
+				// `searchParams.delete()` will not remove individual values
 				params.filter(([name, value]) =>
 				{
 					const isRemovableQuery      = removeEmptyQueries     && name==="" && value==="";
@@ -218,10 +210,10 @@ const minURL = (url, options) =>
 		if (url.search !== "")
 		{
 			url.search = url.search
-			.replace(emptyQueryValue, "$1&")
-			.replace(trailingEquals, "$1");
+			.replace(EMPTY_QUERY_VALUE, "$1&")
+			.replace(TRAILING_EQUALS, "$1");
 		}
-		else if (trailingQuestion.test(url.href))
+		else if (TRAILING_QUESTION.test(url.href))
 		{
 			// Force `href` to update
 			url.search = "";
@@ -230,13 +222,13 @@ const minURL = (url, options) =>
 
 	if (url.search!=="" && defaultValue(options, "plusQueries", url))
 	{
-		// TODO :: https://github.com/whatwg/url/issues/18
-		url.search = url.search.replace(encodedSpace, "+");
+		// @todo https://github.com/whatwg/url/issues/18
+		url.search = url.search.replace(ENCODED_SPACE, "+");
 	}
 
 	if (defaultValue(options, "removeWWW", url))
 	{
-		// TODO :: "www.www.domain.com" doesn't get stripped correctly
+		// @todo "www.www.domain.com" doesn't get stripped correctly
 		url.hostname = stripWWW(url.hostname);
 	}
 

@@ -1,11 +1,11 @@
 # minurl [![NPM Version][npm-image]][npm-url] ![File Size][filesize-image] [![Build Status][travis-image]][travis-url] [![Coverage Status][coveralls-image]][coveralls-url] [![Dependency Monitor][greenkeeper-image]][greenkeeper-url]
 
-> Reduce and normalize the components of a [`URL`](https://developer.mozilla.org/en/docs/Web/API/URL).
+> Reduce and normalize the components of a [`URL`](https://mdn.io/URL).
 
 
 ## Installation
 
-[Node.js](https://nodejs.org/) `>= 8` is required. To install, type this at the command line:
+[Node.js](https://nodejs.org) `>= 14` is required. To install, type this at the command line:
 ```shell
 npm install minurl
 ```
@@ -191,7 +191,7 @@ const custom = extend(true, {}, minURL.COMMON_PROFILE, { indexFilenames:['index.
 
 [npm-image]: https://img.shields.io/npm/v/minurl.svg
 [npm-url]: https://npmjs.com/package/minurl
-[filesize-image]: https://img.shields.io/badge/size-2.7kB%20gzipped-blue.svg
+[filesize-image]: https://img.shields.io/badge/bundle-40kB%20gzipped-blue.svg
 [travis-image]: https://img.shields.io/travis/stevenvachon/minurl.svg
 [travis-url]: https://travis-ci.org/stevenvachon/minurl
 [coveralls-image]: https://img.shields.io/coveralls/stevenvachon/minurl.svg
